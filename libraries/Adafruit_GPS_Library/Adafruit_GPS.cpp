@@ -25,6 +25,21 @@ uint8_t lineidx=0;
 boolean recvdflag;
 boolean inStandbyMode;
 
+enum {
+    FIELD_SENTENCE
+    , FIELD_TIME
+    , FIELD_VALIDITY
+    , FIELD_LATITUDE
+    , FIELD_LONGITUDE
+    , FIELD_ALTITUDE
+    , FIELD_BEARING
+    , FIELD_SPEED
+    , FIELD_FIXQUALITY
+    , FIELD_SATELLITES
+    , FIELD_HDOP
+    , FIELD_NSEW
+    , FIELD_GEOID
+};
 
 bool Adafruit_GPS::parse(char *nmea) {
   // do checksum check
@@ -407,4 +422,4 @@ boolean Adafruit_GPS::wakeup(void) {
       return false;  // Returns false if not in standby mode, nothing to wakeup
   }
   */
-}
+/}

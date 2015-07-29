@@ -27,6 +27,7 @@ private:
     void displaySpeedBer();
     void displaySatFix();
     void SendStatusLights();
+    void displayString(int stringid);
 private:
     float m_latitude;
     float m_longitude;

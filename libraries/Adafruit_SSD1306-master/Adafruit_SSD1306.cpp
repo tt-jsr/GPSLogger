@@ -22,7 +22,10 @@ All text above, and the splash screen below must be included in any redistributi
 #endif
 #include <stdlib.h>
 
+//#define USE_I2C
+#ifdef USE_I2C
 #include <Wire.h>
+#endif
 
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
@@ -188,6 +191,7 @@ void Adafruit_SSD1306::begin(uint8_t vccstate, uint8_t i2caddr, bool reset) {
 #endif
       }
     }
+#ifdef USE_I2C
   else
   {
     // I2C Init
@@ -198,6 +202,7 @@ void Adafruit_SSD1306::begin(uint8_t vccstate, uint8_t i2caddr, bool reset) {
     TWI1->TWI_CWGR = ((VARIANT_MCK / (2 * 400000)) - 4) * 0x101;
 #endif
   }
+#endif // USE_I2C
 
   if (reset) {
     // Setup reset pin direction (used by both SPI and I2C)  
@@ -348,6 +353,7 @@ void Adafruit_SSD1306::ssd1306_command(uint8_t c) {
     //digitalWrite(cs, HIGH);
     *csport |= cspinmask;
   }
+#ifdef USE_I2C
   else
   {
     // I2C
@@ -357,6 +363,7 @@ void Adafruit_SSD1306::ssd1306_command(uint8_t c) {
     WIRE_WRITE(c);
     Wire.endTransmission();
   }
+#endif // USE_I2C
 }
 
 // startscrollright
@@ -462,6 +469,7 @@ void Adafruit_SSD1306::ssd1306_data(uint8_t c) {
     //digitalWrite(cs, HIGH);
     *csport |= cspinmask;
   }
+#ifdef USE_I2C
   else
   {
     // I2C
@@ -471,6 +479,7 @@ void Adafruit_SSD1306::ssd1306_data(uint8_t c) {
     WIRE_WRITE(c);
     Wire.endTransmission();
   }
+#endif // USE_I2C
 }
 
 void Adafruit_SSD1306::display(void) {
@@ -503,6 +512,7 @@ void Adafruit_SSD1306::display(void) {
     }
     *csport |= cspinmask;
   }
+#ifdef USE_I2C
   else
   {
     // save I2C bitrate
@@ -530,6 +540,7 @@ void Adafruit_SSD1306::display(void) {
     TWBR = twbrbackup;
 #endif
   }
+#endif // USE_I2C
 }
 
 // clear everything

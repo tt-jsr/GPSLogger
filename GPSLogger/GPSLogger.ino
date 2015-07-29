@@ -1,4 +1,4 @@
-#include "Wire.h"
+#include "avr/pgmspace.h"
 #include "SPI.h"
 #include "SoftwareSerial.h"
 #include "Adafruit_GPS.h"
@@ -6,27 +6,83 @@
 #include "Adafruit_SSD1306.h"
 #include "common.h"
 #include "display.h"
+#include "Thread.h"
+#include "ThreadController.h"
+#include "SD.h"
 
 SoftwareSerial mySerial(8, 7);
 GPSDisplay display;
 Adafruit_GPS GPS(&mySerial);
 
+// This uses the very nice AuduinoThread library
+// https://github.com/ivanseidel/ArduinoThread
+
+class ButtonThread: public Thread
+{
+public:
+    void setup()
+    {
+      pinMode(PIN_NAV_LEFT, INPUT);
+      digitalWrite(PIN_NAV_LEFT, HIGH);
+      pinMode(PIN_NAV_RIGHT, INPUT);
+      digitalWrite(PIN_NAV_RIGHT, HIGH);
+      pinMode(PIN_OE_ENABLE, OUTPUT);
+      digitalWrite(PIN_OE_ENABLE, LOW);
+      pinMode(PIN_SR_LATCH, OUTPUT);
+      pinMode(PIN_NAV_UP, INPUT);
+      digitalWrite(PIN_NAV_UP, HIGH);
+      pinMode(PIN_NAV_DOWN, INPUT);
+      digitalWrite(PIN_NAV_DOWN, HIGH);
+      pinMode(PIN_NAV_SEL, INPUT);
+      digitalWrite(PIN_NAV_SEL, HIGH);
+      pinMode(PIN_BDISP, INPUT_PULLUP);
+
+      setInterval(500);
+    }
+    void execute()
+    {
+        if (shouldRun())
+           run();
+    }
+private:
+	void run()
+    {
+        if (digitalRead(PIN_NAV_LEFT) == LOW)
+            //display.prevScreen();
+        if (digitalRead(PIN_NAV_RIGHT) == LOW)
+            //display.nextScreen();
+		runned();
+	}
+};
+
+class LoggingThread: public Thread
+{
+public:
+    void setup()
+    {
+      setInterval(10000);
+    }
+
+    void execute()
+    {
+        if (shouldRun())
+            run();
+    }
+private:
+	void run()
+    {
+		runned();
+	}
+};
+
+ButtonThread buttonThread;
+LoggingThread loggingThread;
+
 void setup() {
-  Serial.begin(9600);
-  pinMode(PIN_NAV_LEFT, INPUT);
-  digitalWrite(PIN_NAV_LEFT, HIGH);
-  pinMode(PIN_NAV_RIGHT, INPUT);
-  digitalWrite(PIN_NAV_RIGHT, HIGH);
-  pinMode(PIN_OE_ENABLE, OUTPUT);
-  digitalWrite(PIN_OE_ENABLE, LOW);
-  pinMode(PIN_SR_LATCH, OUTPUT);
-  pinMode(PIN_NAV_UP, INPUT);
-  digitalWrite(PIN_NAV_UP, HIGH);
-  pinMode(PIN_NAV_DOWN, INPUT);
-  digitalWrite(PIN_NAV_DOWN, HIGH);
-  pinMode(PIN_NAV_SEL, INPUT);
-  digitalWrite(PIN_NAV_SEL, HIGH);
-  pinMode(PIN_BDISP, INPUT_PULLUP);
+  //Serial.begin(9600);
+
+  //buttonThread.setup();
+  //loggingThread.setup();
 
   /**** GPS SETUP *****/
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
@@ -53,8 +109,6 @@ void setup() {
   display.splashScreen();
 }
 
-#define BUTTON_HOLD 1000
-
 void loop() {
     if (GPS.isDataAvailable())
     {
@@ -66,12 +120,8 @@ void loop() {
 
         display.refresh();
     }
-    
-    if ((millis()%500) == 0)
-    {
-        if (digitalRead(PIN_NAV_LEFT) == LOW)
-            display.prevScreen();
-        if (digitalRead(PIN_NAV_RIGHT) == LOW)
-            display.nextScreen();
-    }
+
+    buttonThread.execute();
+    loggingThread.execute();
 }
+

@@ -1,22 +1,36 @@
 #include "Arduino.h"
-//#include "avr/pgmspace.h"
+#include "avr/pgmspace.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #include "SPI.h"
 #include "common.h"
 #include "display.h"
 
-/*
-char starting[] PROGMEM = "Starting...";
-char latitude[] PROGMEM = " Latitude: ";
-char longitude[] PROGMEM = "Longitude: ";
-char altitude[] PROGMEM = " Altitude: ";
-char speed[] PROGMEM = "  Speed: ";
-char bearing[] PROGMEM = "Bearing: ";
-char satellites[] PROGMEM = "Satellites: ";
-char fixquality[] PROGMEM = "Fixquality: ";
-char hdop[] PROGMEM = "      HDOP: ";
-*/
+const char string1[] PROGMEM = "Starting...";
+const char string2[] PROGMEM = " Latitude: ";
+const char string3[] PROGMEM = "Longitude: ";
+const char string4[] PROGMEM = " Altitude: ";
+const char string5[] PROGMEM = "  Speed: ";
+const char string6[] PROGMEM = "Bearing: ";
+const char string7[] PROGMEM = "Satellites: ";
+const char string8[] PROGMEM = "Fixquality: ";
+const char string9[] PROGMEM = "      HDOP: ";
+
+const char *const string_table[] PROGMEM = {
+    string1, string2, string3, string4, string5, string6, string7, string8, string9
+};
+
+enum STRING_ID {
+    ID_STARTING
+    , ID_LATITUDE
+    , ID_LONGITUDE
+    , ID_ALTITUDE
+    , ID_SPEED
+    , ID_BEARING
+    , ID_SATELLITES
+    , ID_FIXQUALITY
+    , ID_HDOP
+};
 
 enum DisplayScreen {
     DISP_BEGIN = 0,
@@ -53,7 +67,7 @@ void GPSDisplay::splashScreen()
 {
   m_display.clearDisplay();
   m_display.setTextSize(2);
-  m_display.print("Starting...");
+  displayString(ID_STARTING);
   refresh();
   m_display.setTextSize(1);
 }
@@ -119,11 +133,11 @@ void GPSDisplay::displayLatLon()
         return;
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
-    m_display.print(" Latitude: ");
+    displayString(ID_LATITUDE);
     m_display.println(m_latitude);
-    m_display.print("Longitude: ");
+    displayString(ID_LONGITUDE);
     m_display.println(m_longitude);
-    m_display.print(" Altitude: ");
+    displayString(ID_ALTITUDE);
     m_display.println(m_altitude);
 }
 
@@ -133,9 +147,9 @@ void GPSDisplay::displaySpeedBer()
         return;
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
-    m_display.print("  Speed: ");
+    displayString(ID_SPEED);
     m_display.println(m_speed);
-    m_display.print("Bearing: ");
+    displayString(ID_BEARING);
     m_display.println(m_bearing);
 }
 
@@ -145,11 +159,11 @@ void GPSDisplay::displaySatFix()
         return;
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
-    m_display.print("Satellites: ");
+    displayString(ID_SATELLITES);
     m_display.println(m_satellites);
-    m_display.print("Fixquality: ");
+    displayString(ID_FIXQUALITY);
     m_display.println(m_fixquality);
-    m_display.print("      HDOP: ");
+    displayString(ID_HDOP);
     m_display.println(m_HDOP);
 }
 
@@ -190,4 +204,11 @@ void GPSDisplay::SendStatusLights()
   SPI.transfer(m_leds);
   SPI.endTransaction();
   digitalWrite(PIN_SR_LATCH, HIGH);
+}
+
+void GPSDisplay::displayString(int id)
+{
+    char buf[32];
+    strcpy_P(buf, (char *)pgm_read_word(&string_table[id]));
+    m_display.print(buf);
 }
