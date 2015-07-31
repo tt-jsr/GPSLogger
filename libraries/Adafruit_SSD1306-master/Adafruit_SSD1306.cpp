@@ -103,8 +103,6 @@ static uint8_t buffer[SSD1306_LCDHEIGHT * SSD1306_LCDWIDTH / 8] = {
 #endif
 };
 
-
-
 // the most basic function, set a single pixel
 void Adafruit_SSD1306::drawPixel(int16_t x, int16_t y, uint16_t color) {
   if ((x < 0) || (x >= width()) || (y < 0) || (y >= height()))
@@ -482,7 +480,7 @@ void Adafruit_SSD1306::ssd1306_data(uint8_t c) {
 #endif // USE_I2C
 }
 
-void Adafruit_SSD1306::display(void) {
+void Adafruit_SSD1306::display() {
   ssd1306_command(SSD1306_COLUMNADDR);
   ssd1306_command(0);   // Column start address (0 = reset)
   ssd1306_command(SSD1306_LCDWIDTH-1); // Column end address (127 = reset)
@@ -544,7 +542,7 @@ void Adafruit_SSD1306::display(void) {
 }
 
 // clear everything
-void Adafruit_SSD1306::clearDisplay(void) {
+void Adafruit_SSD1306::clearDisplay() {
   memset(buffer, 0, (SSD1306_LCDWIDTH*SSD1306_LCDHEIGHT/8));
 }
 

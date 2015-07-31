@@ -1,18 +1,28 @@
+#include "common.h"
+
+#include "Arduino.h"
 #include "avr/pgmspace.h"
 #include "SPI.h"
-#include "SoftwareSerial.h"
-#include "Adafruit_GPS.h"
-#include "Adafruit_GFX.h"
-#include "Adafruit_SSD1306.h"
-#include "common.h"
-#include "display.h"
+
+#ifdef USE_SOFTWARE_SERIAL
+#include <SoftwareSerial.h>
+#endif
+
+#include "SD.h"
 #include "Thread.h"
 #include "ThreadController.h"
-#include "SD.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_SSD1306.h"
+#include "display.h"
+#include "GPS.h"
 
+#ifdef USE_SOFTWARE_SERIAL
 SoftwareSerial mySerial(8, 7);
+#else
+HardwareSerial mySerial = Serial;
+#endif
 GPSDisplay display;
-Adafruit_GPS GPS(&mySerial);
+GPS gps(&mySerial, &display);
 
 // This uses the very nice AuduinoThread library
 // https://github.com/ivanseidel/ArduinoThread
@@ -48,80 +58,62 @@ private:
 	void run()
     {
         if (digitalRead(PIN_NAV_LEFT) == LOW)
-            //display.prevScreen();
+            display.prevScreen();
         if (digitalRead(PIN_NAV_RIGHT) == LOW)
-            //display.nextScreen();
-		runned();
-	}
-};
-
-class LoggingThread: public Thread
-{
-public:
-    void setup()
-    {
-      setInterval(10000);
-    }
-
-    void execute()
-    {
-        if (shouldRun())
-            run();
-    }
-private:
-	void run()
-    {
+            display.nextScreen();
 		runned();
 	}
 };
 
 ButtonThread buttonThread;
-LoggingThread loggingThread;
+File logfile;
 
 void setup() {
   //Serial.begin(9600);
 
-  //buttonThread.setup();
-  //loggingThread.setup();
+  buttonThread.setup();
 
   /**** GPS SETUP *****/
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
-  GPS.begin(9600);
+  gps.begin(9600);
   
   // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
-  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   // uncomment this line to turn on only the "minimum recommended" data
-  //GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-  // For parsing data, we don't suggest using anything but either RMC only or RMC+GGA since
-  // the parser doesn't care about other sentences at this time
-  
+
   // Set the update rate
-  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_200_MILLIHERTZ);   // Every 5 secs update rate
-  // For the parsing code to work nicely and have time to sort thru the data, and
-  // print it out we don't suggest using anything higher than 1 Hz
+  gps.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // Every 1 secs update rate
 
   // Request updates on antenna status, comment out to keep quiet
-  //GPS.sendCommand(PGCMD_ANTENNA);
+  //gps.sendCommand(PGCMD_ANTENNA);
 
+  //SD.begin(SD_CS);
+  //logfile = SD.open("datalog.txt", FILE_WRITE);
+  
   display.setup();
-  display.SetFixStatus(false);
-  display.SetLoggingStatus(LOG_DISABLED);
   display.splashScreen();
 }
 
+#define LOG_INTERVAL 10
+byte counter = 0;
 void loop() {
-    if (GPS.isDataAvailable())
+    char c = 0;
+    if (gps.isDataAvailable(c))
     {
-        GPS.clearDataAvailable();
-        display.setPosition(GPS.latitudeDegrees, GPS.longitudeDegrees, GPS.altitude);
-        display.setSpeedBearing(GPS.speed, GPS.angle);
-        display.setSatellites(GPS.fixquality, GPS.satellites, GPS.HDOP);
-        display.SetFixStatus(GPS.fix);
-
+        gps.clearDataAvailable();
         display.refresh();
     }
-
+    if (c)
+    {
+        if (c == '$')
+            ++counter;
+        if (counter == LOG_INTERVAL)
+        {
+            //logfile.write(c);
+            if (c == '\n')
+                counter = 0;
+        }
+    }
     buttonThread.execute();
-    loggingThread.execute();
 }
 

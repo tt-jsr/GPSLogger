@@ -1,9 +1,11 @@
+#include "common.h"
+
 #include "Arduino.h"
 #include "avr/pgmspace.h"
+#include "SPI.h"
+
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
-#include "SPI.h"
-#include "common.h"
 #include "display.h"
 
 const char string1[] PROGMEM = "Starting...";
@@ -37,22 +39,36 @@ enum DisplayScreen {
     DISP_LATLON = 1,
     DISP_SPEEDBER = 2,
     DISP_SATFIX = 3,
-    DISP_END = 4
+    DISP_MESSAGE = 4,
+    DISP_END = 5
 };
 
 GPSDisplay::GPSDisplay()
-: m_latitude(0.0)
-, m_longitude(0.0)
-, m_altitude(0.0)
-, m_bearing(0.0)
-, m_speed(0.0)
-, m_HDOP(0.0)
-, m_fixquality(0)
-, m_satellites(0)
+: latitude(0.0)
+, longitude(0.0)
+, altitude(0.0)
+, fix(false)
+, bearing(0.0)
+, speed(0.0)
+, HDOP(0.0)
+, fixquality(0)
+, satellites(0)
+, lat_ns(0)
+, lon_ew(0)
+, hour(0)
+, minute(0)
+, seconds(0)
+, milliseconds(0)
+, day(0)
+, month(0)
+, year(0)
 , m_currentDisplayScreen(DISP_LATLON)
 , m_leds(0xff)
 , m_display(OLED_DC, OLED_RESET, OLED_CS)
 {
+    SetFixStatus(false);
+    SetLoggingStatus(LOG_DISABLED);
+    strcpy(message, "Startup");
 }
 
 void GPSDisplay::setup()
@@ -88,26 +104,6 @@ void GPSDisplay::prevScreen()
     refresh();
 }
 
-void GPSDisplay::setPosition(float lat, float lng, float altitude)
-{
-    m_latitude = lat;
-    m_longitude = lng;
-    m_altitude = altitude;
-}
-
-void GPSDisplay::setSpeedBearing(float speed, float angle)
-{
-    m_speed = speed;
-    m_bearing = angle;
-}
-
-void GPSDisplay::setSatellites(byte fixquality, byte satellites, float hdop)
-{
-    m_fixquality = fixquality;
-    m_satellites = satellites;
-    m_HDOP = hdop;
-}
-
 void GPSDisplay::refresh()
 {
     switch(m_currentDisplayScreen)
@@ -121,8 +117,12 @@ void GPSDisplay::refresh()
         case DISP_SATFIX:
             displaySatFix();
             break;
+        case DISP_MESSAGE:
+            displayMessage();
+            break;
     }
 
+    SetFixStatus(fix);
     m_display.display();
     SendStatusLights();
 }
@@ -134,11 +134,11 @@ void GPSDisplay::displayLatLon()
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
     displayString(ID_LATITUDE);
-    m_display.println(m_latitude);
+    m_display.println(latitude);
     displayString(ID_LONGITUDE);
-    m_display.println(m_longitude);
+    m_display.println(longitude);
     displayString(ID_ALTITUDE);
-    m_display.println(m_altitude);
+    m_display.println(altitude);
 }
 
 void GPSDisplay::displaySpeedBer()
@@ -148,9 +148,9 @@ void GPSDisplay::displaySpeedBer()
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
     displayString(ID_SPEED);
-    m_display.println(m_speed);
+    m_display.println(speed);
     displayString(ID_BEARING);
-    m_display.println(m_bearing);
+    m_display.println(bearing);
 }
 
 void GPSDisplay::displaySatFix()
@@ -160,11 +160,20 @@ void GPSDisplay::displaySatFix()
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
     displayString(ID_SATELLITES);
-    m_display.println(m_satellites);
+    m_display.println(satellites);
     displayString(ID_FIXQUALITY);
-    m_display.println(m_fixquality);
+    m_display.println(fixquality);
     displayString(ID_HDOP);
-    m_display.println(m_HDOP);
+    m_display.println(HDOP);
+}
+
+void GPSDisplay::displayMessage()
+{
+    if (m_currentDisplayScreen != DISP_MESSAGE)
+        return;
+    m_display.clearDisplay();
+    m_display.setCursor(0, 0);
+    m_display.println(message);
 }
 
 void GPSDisplay::SetFixStatus(bool b)

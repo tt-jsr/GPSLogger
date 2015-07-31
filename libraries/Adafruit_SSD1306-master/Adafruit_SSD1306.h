@@ -15,6 +15,8 @@ Written by Limor Fried/Ladyada  for Adafruit Industries.
 BSD license, check license.txt for more information
 All text above, and the splash screen must be included in any redistribution
 *********************************************************************/
+#ifndef ADAFRUIT_SSD1306_H_
+#define ADAFRUIT_SSD1306_H_
 
 #if ARDUINO >= 100
  #include "Arduino.h"
@@ -138,7 +140,7 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
   void ssd1306_command(uint8_t c);
   void ssd1306_data(uint8_t c);
 
-  void clearDisplay(void);
+  void clearDisplay();
   void invertDisplay(uint8_t i);
   void display();
 
@@ -168,3 +170,5 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
   inline void drawFastHLineInternal(int16_t x, int16_t y, int16_t w, uint16_t color) __attribute__((always_inline));
 
 };
+
+#endif // ADAFRUIT_SSD1306_H_
