@@ -19,9 +19,12 @@ const char string8[] PROGMEM = "Fixquality: ";
 const char string9[] PROGMEM = "      HDOP: ";
 const char string10[] PROGMEM = "Failed to open file";
 const char string11[] PROGMEM = "Logging...";
+const char string12[] PROGMEM = "#Records: ";
+const char string13[] PROGMEM = "Distance: ";
 
 const char *const string_table[] PROGMEM = {
     string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11
+    , string12, string13
 };
 
 enum STRING_ID {
@@ -36,6 +39,8 @@ enum STRING_ID {
     , ID_HDOP
     , ID_LOGFILE_FAILED
     , ID_RUN_LOGGING
+    , ID_NUMRECS
+    , ID_DISTANCE
 };
 
 enum DisplayScreen {
@@ -44,13 +49,55 @@ enum DisplayScreen {
     DISP_SPEEDBER = 2,
     DISP_SATFIX = 3,
     DISP_TIME = 4,
-#ifdef HAS_MESSAGE
-    DISP_MESSAGE = 5,
+    DISP_TRACK = 5,
     DISP_END = 6
-#else
-    DISP_END = 5
-#endif
 };
+
+int aprintf(Adafruit_SSD1306& display, char *str, ...) {
+    int i, j, count = 0;
+
+    va_list argv;
+    va_start(argv, str);
+    for(i = 0, j = 0; str[i] != '\0'; i++) {
+        if (str[i] == '%') {
+            count++;
+
+            display.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
+
+            switch (str[++i]) {
+                case 'S': 
+                    {
+                        char buf[32];
+                        strcpy_P(buf, (char *)pgm_read_word(&string_table[va_arg(argv, int)]));
+                        display.print(buf);
+                    }
+                    break;
+                case 'd': display.print(va_arg(argv, int));
+                          break;
+                case 'l': display.print(va_arg(argv, long));
+                          break;
+                case 'f': display.print(va_arg(argv, double));
+                          break;
+                case 'c': display.print((char) va_arg(argv, int));
+                          break;
+                case 's': display.print(va_arg(argv, char *));
+                          break;
+                case '%': display.print("%");
+                          break;
+                default:;
+            };
+
+            j = i+1;
+        }
+    };
+    va_end(argv);
+
+    if(i > j) {
+        display.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
+    }
+
+    return count;
+}
 /*************************************************/
 StatusLights::StatusLights()
 : m_leds(0xff)
@@ -101,7 +148,8 @@ void StatusLights::SendStatusLights()
 /***************************************************/
 
 GPSDisplay::GPSDisplay()
-: latitude(0.0)
+: m_display(OLED_DC, OLED_RESET, OLED_CS)
+, latitude(0.0)
 , longitude(0.0)
 , altitude(0.0)
 , bearing(0.0)
@@ -118,8 +166,9 @@ GPSDisplay::GPSDisplay()
 , day(0)
 , month(0)
 , year(0)
+, numrecs(0)
+, distance(0.0)
 , m_currentDisplayScreen(DISP_LATLON)
-, m_display(OLED_DC, OLED_RESET, OLED_CS)
 {
 }
 
@@ -198,11 +247,9 @@ void GPSDisplay::refresh()
         case DISP_TIME:
             displayTime();
             break;
-#ifdef HAS_MESSAGE
-        case DISP_MESSAGE:
-            displayMessage();
+        case DISP_TRACK:
+            displayTrack();
             break;
-#endif
     }
 
     m_display.display();
@@ -229,7 +276,7 @@ void GPSDisplay::displaySpeedBer()
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
     displayString(ID_SPEED);
-    m_display.println(speed);
+    m_display.println(speed*1.15078);
     displayString(ID_BEARING);
     m_display.println(bearing);
 }
@@ -248,16 +295,17 @@ void GPSDisplay::displaySatFix()
     m_display.println(HDOP);
 }
 
-#ifdef HAS_MESSAGE
-void GPSDisplay::displayMessage()
+void GPSDisplay::displayTrack()
 {
-    if (m_currentDisplayScreen != DISP_MESSAGE)
+    if (m_currentDisplayScreen != DISP_TRACK)
         return;
     m_display.clearDisplay();
     m_display.setCursor(0, 0);
-    m_display.println(message);
+    displayString(ID_NUMRECS);
+    m_display.println(numrecs);
+    displayString(ID_DISTANCE);
+    m_display.println(distance);
 }
-#endif
 
 void GPSDisplay::displayTime()
 {
@@ -277,7 +325,7 @@ void GPSDisplay::displayTime()
     m_display.print(seconds);
     m_display.print(".");
     m_display.print(milliseconds);
-    m_display.print(" utc");
+    m_display.print(" UTC");
 }
 
 void GPSDisplay::displayString(int id)

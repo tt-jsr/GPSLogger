@@ -1,6 +1,5 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
-//#define HAS_MESSAGE
 
 enum LoggingStatus
 {
@@ -51,15 +50,15 @@ public:
     byte day;
     byte month;
     int year;
-#ifdef HAS_MESSAGE
-    char message[32];
-#endif
+    int numrecs;
+    float distance;
 private:
     void displayLatLon();
     void displaySpeedBer();
     void displaySatFix();
     void displayMessage();
     void displayTime();
+    void displayTrack();
     void displayString(int stringid);
 private:
     int m_currentDisplayScreen;

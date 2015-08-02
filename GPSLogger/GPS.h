@@ -20,6 +20,7 @@
 
 #define PMTK_SET_BAUD_57600 "$PMTK251,57600*2C"
 #define PMTK_SET_BAUD_9600 "$PMTK251,9600*17"
+#define PMTK_SET_BAUD_4800 "$PMTK251,4800*14"
 
 // turn on only the second sentence (GPRMC)
 #define PMTK_SET_NMEA_OUTPUT_RMCONLY "$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29"
@@ -59,19 +60,24 @@
 // how long to wait when we're looking for a response
 #define MAXWAITSENTENCE 5
 
-typedef void (*FieldCallback)(char);
+typedef void (*FieldCallback)(char *);
+
+enum {
+    SENTENCE_UNKNOWN
+    , SENTENCE_GGA
+    , SENTENCE_RMC
+};
 
 class GPS {
  public:
   void begin(uint16_t baud); 
 
-#ifdef USE_SOFTWARE_SERIAL
+#ifdef GPS_USES_SOFTWARE_SERIAL
   GPS(SoftwareSerial *ser); // Constructor when using SoftwareSerial
 #else
   GPS(HardwareSerial *ser); // Constructor when using HardwareSerial
 #endif
 
-  void setdisplay(GPSDisplay *);
   boolean isDataAvailable();
   void clearDataAvailable();
 
@@ -82,6 +88,7 @@ class GPS {
 
   bool fix;
   void register_field_callback(FieldCallback);
+  byte sentenceType() {return currentSentence;}
  private:
   void common_init(void);
   void read(void);
@@ -92,12 +99,10 @@ class GPS {
   void endOfField();
  private:
   byte currentField;
-  byte currentSentence;
   boolean paused;
-  GPSDisplay *pDisplay;
+  byte currentSentence;
   FieldCallback fieldCallback;
-  
-#ifdef USE_SOFTWARE_SERIAL
+#ifdef GPS_USES_SOFTWARE_SERIAL
   SoftwareSerial *pSerial;
 #else
   HardwareSerial *pSerial;

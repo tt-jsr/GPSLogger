@@ -1,7 +1,8 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
-#define USE_SOFTWARE_SERIAL
+#define GPS_USES_SOFTWARE_SERIAL
+//#define OUTPUT_SERIAL
 
 #define OLED_DC     9
 #define OLED_CS     6

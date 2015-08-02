@@ -4,23 +4,18 @@
 #include "avr/pgmspace.h"
 #include "SPI.h"
 
-#ifdef USE_SOFTWARE_SERIAL
+#ifdef GPS_USES_SOFTWARE_SERIAL
 #include <SoftwareSerial.h>
 #endif
 
+#ifndef OUTPUT_SERIAL
 #include "SD.h"
+#endif
 #include "Thread.h"
 #include "ThreadController.h"
-#include "Adafruit_GFX.h"
-#include "Adafruit_SSD1306.h"
-#include "display.h"
 #include "GPS.h"
 
-#ifdef USE_SOFTWARE_SERIAL
 SoftwareSerial mySerial(8, 7);
-#else
-HardwareSerial mySerial = Serial;
-#endif
 GPS gps(&mySerial);
 StatusLights statusLights;
 
@@ -33,10 +28,9 @@ enum {
 byte runLoop = LOOP_DISPLAY;
 
 File *pLogfile = NULL;
-GPSDisplay *pDisplay = NULL;
 bool openFailed = false;
 
-#define LOG_INTERVAL  10
+#define LOG_INTERVAL  10000 // in milliseconds
 
 // This uses the very nice AuduinoThread library
 // https://github.com/ivanseidel/ArduinoThread
@@ -71,17 +65,6 @@ public:
 private:
 	void run()
     {
-        if (runLoop == LOOP_DISPLAY)
-        {
-            if (digitalRead(PIN_NAV_UP) == LOW)
-                if (pDisplay) pDisplay->firstScreen();
-            if (digitalRead(PIN_NAV_DOWN) == LOW)
-                if (pDisplay) pDisplay->lastScreen();
-            if (digitalRead(PIN_NAV_LEFT) == LOW)
-                if (pDisplay) pDisplay->prevScreen();
-            if (digitalRead(PIN_NAV_RIGHT) == LOW)
-                if (pDisplay) pDisplay->nextScreen();
-        }
         if (digitalRead(PIN_BUT_DISP) == LOW)
         {
             switch(runLoop)
@@ -91,7 +74,6 @@ private:
                 break;
             case LOOP_DISPLAY:
                 runLoop = LOOP_LOGGING;
-                if (pDisplay) pDisplay->runningLogging();
                 break;
             case LOOP_LOGGING:
                 runLoop = LOOP_DISPLAY;
@@ -104,55 +86,54 @@ private:
 
 ButtonThread buttonThread;
 
-int logcounter = 0;
-int linecounter = 0;
-
-#define MAXLINELEN 85
-byte lineidx = 0;
-char nmeaLine[MAXLINELEN];
-
-void field_callback_logging(char c)
+int numrecs = 0;
+unsigned long resetStatusLight = ~0;
+unsigned long readyRMC = 0;
+unsigned long readyGGA = 0;
+void field_callback(char *p)
 {
-    //Serial.print(c);
-    if (pLogfile == NULL)
-        return;
-    nmeaLine[lineidx++] = c;
-    if (lineidx == MAXLINELEN)
-        --lineidx;
-    if (c == '\n')
+   //DEBUG(p);
+    if (resetStatusLight < millis())
     {
-        ++logcounter;
-        nmeaLine[lineidx] = 0;
         statusLights.SetLoggingStatus(LOG_ENABLED);
         statusLights.SendStatusLights();
-        pLogfile->print(nmeaLine);
-        //pLogfile->flush();
-        lineidx = 0;
+        resetStatusLight = ~0;
+    }
+    if (pLogfile == NULL)
         return;
-    }
-    statusLights.SetLoggingStatus(LOG_WRITING);
-    statusLights.SendStatusLights();
-}
 
-void field_callback(char c)
-{
-    if (c == '\n')
+    if (strlen(p) > 6)
     {
-        ++linecounter;
+        if ((strncmp(p, "$GPRMC", 6) == 0) && readyRMC < millis())
+        {
+            statusLights.SetLoggingStatus(LOG_WRITING);
+            statusLights.SendStatusLights();
+            pLogfile->write(p);
+            resetStatusLight = millis() + 500;
+            readyRMC = millis() + LOG_INTERVAL;
+            ++numrecs;
+        }
+        if ((strncmp(p, "$GPGGA", 6) == 0) && readyGGA < millis())
+        {
+            statusLights.SetLoggingStatus(LOG_WRITING);
+            statusLights.SendStatusLights();
+            pLogfile->write(p);
+            resetStatusLight = millis() + 500;
+            readyGGA = millis() + LOG_INTERVAL;
+            ++numrecs;
+        }
     }
-    if ((linecounter % LOG_INTERVAL) == 0)
-        field_callback_logging(c);
 }
 
 void setup() {
-    //Serial.begin(9600);
-
     buttonThread.setup();
 
     /**** GPS SETUP *****/
     // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
-    gps.begin(9600);
+    gps.begin(4800);
 
+    //gps.sendCommand(PMTK_SET_BAUD_4800);
+    //gps.begin(4800);
     // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
     gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
     // uncomment this line to turn on only the "minimum recommended" data
@@ -170,13 +151,12 @@ void setup() {
     gps.register_field_callback(field_callback);
 }
 
-#define LOG_INTERVAL 10
 void loggingLoop()
 {
-    File logfile = SD.open("datalog.nmea", FILE_WRITE);
-    if (!logfile)
+    File logfile;
+    bool r = SD.open("DATALOG.TXT", O_WRITE | O_CREAT | O_APPEND);
+    if (!r)
     {
-        //Serial.println("File opened error");
         statusLights.SetLoggingStatus(LOG_DISABLED);
         statusLights.SendStatusLights();
         openFailed = true;
@@ -206,17 +186,7 @@ void loggingLoop()
 
 void displayLoop()
 {
-    GPSDisplay display;
-    display.setup();
-    display.splashScreen();
-    pDisplay = &display;
-    gps.setdisplay(&display);
-    if (openFailed)
-    {
-        display.failedToOpenLogfile();
-        delay(1000);
-        openFailed = false;
-    }
+    pLogfile = NULL;
     while (runLoop == LOOP_DISPLAY)
     {
         if (gps.isDataAvailable())
@@ -224,13 +194,10 @@ void displayLoop()
             gps.clearDataAvailable();
             statusLights.SetFixStatus(gps.fix);
             statusLights.SendStatusLights();
-            display.refresh();
         }
         buttonThread.execute();
         if (serialEventRun) serialEventRun();
     }
-    pDisplay = NULL;
-    gps.setdisplay(NULL);
 }
 
 void loop() {
