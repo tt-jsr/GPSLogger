@@ -1,5 +1,6 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
+//#define HAS_MESSAGE
 
 enum LoggingStatus
 {
@@ -8,21 +9,34 @@ enum LoggingStatus
   LOG_WRITING = 2
 };
 
+class StatusLights
+{
+public:
+    StatusLights();
+    void SetLoggingStatus(int loggingStatus);
+    void SetFixStatus(bool);
+    void SendStatusLights();
+private:
+    byte m_leds;
+};
+
 class GPSDisplay
 {
 public:
     GPSDisplay();
     void setup();
     void splashScreen();
+    void firstScreen();
+    void lastScreen();
     void nextScreen();
     void prevScreen();
-    void SetLoggingStatus(int loggingStatus);
     void refresh();
+    void runningLogging();
+    void failedToOpenLogfile();
 public:
     float latitude;
     float longitude;
     float altitude;
-    bool fix;
     float bearing;
     float speed;
     float HDOP;
@@ -37,18 +51,18 @@ public:
     byte day;
     byte month;
     int year;
+#ifdef HAS_MESSAGE
     char message[32];
+#endif
 private:
     void displayLatLon();
     void displaySpeedBer();
     void displaySatFix();
     void displayMessage();
-    void SendStatusLights();
-    void SetFixStatus(bool);
+    void displayTime();
     void displayString(int stringid);
 private:
     int m_currentDisplayScreen;
-    byte m_leds;
     Adafruit_SSD1306 m_display;
 };
 

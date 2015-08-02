@@ -17,9 +17,11 @@ const char string6[] PROGMEM = "Bearing: ";
 const char string7[] PROGMEM = "Satellites: ";
 const char string8[] PROGMEM = "Fixquality: ";
 const char string9[] PROGMEM = "      HDOP: ";
+const char string10[] PROGMEM = "Failed to open file";
+const char string11[] PROGMEM = "Logging...";
 
 const char *const string_table[] PROGMEM = {
-    string1, string2, string3, string4, string5, string6, string7, string8, string9
+    string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11
 };
 
 enum STRING_ID {
@@ -32,6 +34,8 @@ enum STRING_ID {
     , ID_SATELLITES
     , ID_FIXQUALITY
     , ID_HDOP
+    , ID_LOGFILE_FAILED
+    , ID_RUN_LOGGING
 };
 
 enum DisplayScreen {
@@ -39,15 +43,67 @@ enum DisplayScreen {
     DISP_LATLON = 1,
     DISP_SPEEDBER = 2,
     DISP_SATFIX = 3,
-    DISP_MESSAGE = 4,
+    DISP_TIME = 4,
+#ifdef HAS_MESSAGE
+    DISP_MESSAGE = 5,
+    DISP_END = 6
+#else
     DISP_END = 5
+#endif
 };
+/*************************************************/
+StatusLights::StatusLights()
+: m_leds(0xff)
+{
+    SetFixStatus(false);
+    SetLoggingStatus(LOG_DISABLED);
+}
+
+void StatusLights::SetFixStatus(bool b)
+{
+  bitSet(m_leds, 4); // green
+  bitSet(m_leds, 3);
+  if (b)
+    bitClear(m_leds, 4);
+  else
+    bitClear(m_leds, 3);
+}
+
+void StatusLights::SetLoggingStatus(int loggingStatus)
+{
+  bitSet(m_leds, 0);
+  bitSet(m_leds, 1);
+  bitSet(m_leds, 2);
+  
+  switch(loggingStatus)
+  {
+    case LOG_DISABLED:
+      bitClear(m_leds, 0);
+      break;
+    case LOG_ENABLED:
+      bitClear(m_leds, 1);
+      break;
+    case LOG_WRITING:
+      bitClear(m_leds, 2);
+      break;
+  }
+}
+
+void StatusLights::SendStatusLights()
+{
+  digitalWrite(PIN_SR_LATCH, LOW);
+  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+  SPI.transfer(m_leds);
+  SPI.endTransaction();
+  digitalWrite(PIN_SR_LATCH, HIGH);
+}
+
+/***************************************************/
 
 GPSDisplay::GPSDisplay()
 : latitude(0.0)
 , longitude(0.0)
 , altitude(0.0)
-, fix(false)
 , bearing(0.0)
 , speed(0.0)
 , HDOP(0.0)
@@ -63,12 +119,8 @@ GPSDisplay::GPSDisplay()
 , month(0)
 , year(0)
 , m_currentDisplayScreen(DISP_LATLON)
-, m_leds(0xff)
 , m_display(OLED_DC, OLED_RESET, OLED_CS)
 {
-    SetFixStatus(false);
-    SetLoggingStatus(LOG_DISABLED);
-    strcpy(message, "Startup");
 }
 
 void GPSDisplay::setup()
@@ -82,10 +134,8 @@ void GPSDisplay::setup()
 void GPSDisplay::splashScreen()
 {
   m_display.clearDisplay();
-  m_display.setTextSize(2);
   displayString(ID_STARTING);
   refresh();
-  m_display.setTextSize(1);
 }
 
 void GPSDisplay::nextScreen()
@@ -104,6 +154,34 @@ void GPSDisplay::prevScreen()
     refresh();
 }
 
+void GPSDisplay::firstScreen()
+{
+    m_currentDisplayScreen = 1;
+    refresh();
+}
+
+void GPSDisplay::lastScreen()
+{
+    m_currentDisplayScreen = DISP_END-1;
+    refresh();
+}
+
+void GPSDisplay::runningLogging()
+{
+    m_display.clearDisplay();
+    m_display.setCursor(0, 0);
+    displayString(ID_RUN_LOGGING);
+    m_display.display();
+}
+
+void GPSDisplay::failedToOpenLogfile()
+{
+    m_display.clearDisplay();
+    m_display.setCursor(0, 0);
+    displayString(ID_LOGFILE_FAILED);
+    m_display.display();
+}
+
 void GPSDisplay::refresh()
 {
     switch(m_currentDisplayScreen)
@@ -117,14 +195,17 @@ void GPSDisplay::refresh()
         case DISP_SATFIX:
             displaySatFix();
             break;
+        case DISP_TIME:
+            displayTime();
+            break;
+#ifdef HAS_MESSAGE
         case DISP_MESSAGE:
             displayMessage();
             break;
+#endif
     }
 
-    SetFixStatus(fix);
     m_display.display();
-    SendStatusLights();
 }
 
 void GPSDisplay::displayLatLon()
@@ -167,6 +248,7 @@ void GPSDisplay::displaySatFix()
     m_display.println(HDOP);
 }
 
+#ifdef HAS_MESSAGE
 void GPSDisplay::displayMessage()
 {
     if (m_currentDisplayScreen != DISP_MESSAGE)
@@ -175,44 +257,27 @@ void GPSDisplay::displayMessage()
     m_display.setCursor(0, 0);
     m_display.println(message);
 }
+#endif
 
-void GPSDisplay::SetFixStatus(bool b)
+void GPSDisplay::displayTime()
 {
-  bitSet(m_leds, 4); // green
-  bitSet(m_leds, 3);
-  if (b)
-    bitClear(m_leds, 4);
-  else
-    bitClear(m_leds, 3);
-}
-
-void GPSDisplay::SetLoggingStatus(int loggingStatus)
-{
-  bitSet(m_leds, 0);
-  bitSet(m_leds, 1);
-  bitSet(m_leds, 2);
-  
-  switch(loggingStatus)
-  {
-    case LOG_DISABLED:
-      bitClear(m_leds, 0);
-      break;
-    case LOG_ENABLED:
-      bitClear(m_leds, 1);
-      break;
-    case LOG_WRITING:
-      bitClear(m_leds, 2);
-      break;
-  }
-}
-
-void GPSDisplay::SendStatusLights()
-{
-  digitalWrite(PIN_SR_LATCH, LOW);
-  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-  SPI.transfer(m_leds);
-  SPI.endTransaction();
-  digitalWrite(PIN_SR_LATCH, HIGH);
+    if (m_currentDisplayScreen != DISP_TIME)
+        return;
+    m_display.clearDisplay();
+    m_display.setCursor(0, 0);
+    m_display.print(month);
+    m_display.print("/");
+    m_display.print(day);
+    m_display.print("/");
+    m_display.println(year);
+    m_display.print(hour);
+    m_display.print(":");
+    m_display.print(minute);
+    m_display.print(":");
+    m_display.print(seconds);
+    m_display.print(".");
+    m_display.print(milliseconds);
+    m_display.print(" utc");
 }
 
 void GPSDisplay::displayString(int id)
