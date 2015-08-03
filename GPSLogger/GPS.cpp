@@ -8,7 +8,7 @@
 //#include "display.h"
 
 #include <SoftwareSerial.h>
-#include "SD.h"
+#include "JSD.h"
 #include "GPS.h"
 
 #define MAXFIELDLENGTH 10

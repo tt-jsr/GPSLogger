@@ -6,7 +6,7 @@
 
 #include <SoftwareSerial.h>
 
-#include "SD.h"
+#include "JSD.h"
 #include "Thread.h"
 #include "ThreadController.h"
 #include "GPS.h"
@@ -210,6 +210,8 @@ void setup() {
 void loggingLoop()
 {
     File logfile;
+    cache_t cache;
+    SdVolume::SetCache(cache);
     logfile = SD.open("DATALOG.TXT", O_WRITE | O_CREAT | O_APPEND);
     if (!logfile)
     {
