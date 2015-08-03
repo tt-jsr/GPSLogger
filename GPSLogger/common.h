@@ -2,7 +2,6 @@
 #define _COMMON_H_
 
 #define GPS_USES_SOFTWARE_SERIAL
-//#define OUTPUT_SERIAL
 
 #define OLED_DC     9
 #define OLED_CS     6

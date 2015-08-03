@@ -62,12 +62,6 @@
 
 typedef void (*FieldCallback)(char *);
 
-enum {
-    SENTENCE_UNKNOWN
-    , SENTENCE_GGA
-    , SENTENCE_RMC
-};
-
 class GPS {
  public:
   void begin(uint16_t baud); 

@@ -4,19 +4,72 @@
 #include "avr/pgmspace.h"
 #include "SPI.h"
 
-#ifdef GPS_USES_SOFTWARE_SERIAL
 #include <SoftwareSerial.h>
-#endif
 
-#ifndef OUTPUT_SERIAL
 #include "SD.h"
-#endif
 #include "Thread.h"
 #include "ThreadController.h"
 #include "GPS.h"
 
 SoftwareSerial mySerial(8, 7);
 GPS gps(&mySerial);
+
+enum LoggingStatus
+{
+  LOG_DISABLED = 0,
+  LOG_ENABLED = 1,
+  LOG_WRITING = 2
+};
+
+class StatusLights
+{
+public:
+    StatusLights()
+    : m_leds(0xff)
+    {
+        SetFixStatus(false);
+        SetLoggingStatus(LOG_DISABLED);
+    }
+    void SetLoggingStatus(int loggingStatus)
+    {
+      bitSet(m_leds, 0);
+      bitSet(m_leds, 1);
+      bitSet(m_leds, 2);
+      
+      switch(loggingStatus)
+      {
+        case LOG_DISABLED:
+          bitClear(m_leds, 0);
+          break;
+        case LOG_ENABLED:
+          bitClear(m_leds, 1);
+          break;
+        case LOG_WRITING:
+          bitClear(m_leds, 2);
+          break;
+      }
+    }
+    void SetFixStatus(bool b)
+    {
+      bitSet(m_leds, 4); // green
+      bitSet(m_leds, 3);
+      if (b)
+        bitClear(m_leds, 4);
+      else
+        bitClear(m_leds, 3);
+    }
+    void SendStatusLights()
+    {
+      digitalWrite(PIN_SR_LATCH, LOW);
+      SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+      SPI.transfer(m_leds);
+      SPI.endTransaction();
+      digitalWrite(PIN_SR_LATCH, HIGH);
+    }
+private:
+    byte m_leds;
+};
+
 StatusLights statusLights;
 
 enum {
@@ -92,7 +145,7 @@ unsigned long readyRMC = 0;
 unsigned long readyGGA = 0;
 void field_callback(char *p)
 {
-   //DEBUG(p);
+    //Serial.print(p);
     if (resetStatusLight < millis())
     {
         statusLights.SetLoggingStatus(LOG_ENABLED);
@@ -108,6 +161,7 @@ void field_callback(char *p)
         {
             statusLights.SetLoggingStatus(LOG_WRITING);
             statusLights.SendStatusLights();
+            //Serial.print(p);
             pLogfile->write(p);
             resetStatusLight = millis() + 500;
             readyRMC = millis() + LOG_INTERVAL;
@@ -117,6 +171,7 @@ void field_callback(char *p)
         {
             statusLights.SetLoggingStatus(LOG_WRITING);
             statusLights.SendStatusLights();
+            //Serial.print(p);
             pLogfile->write(p);
             resetStatusLight = millis() + 500;
             readyGGA = millis() + LOG_INTERVAL;
@@ -126,6 +181,7 @@ void field_callback(char *p)
 }
 
 void setup() {
+    Serial.begin(9600);
     buttonThread.setup();
 
     /**** GPS SETUP *****/
@@ -154,8 +210,8 @@ void setup() {
 void loggingLoop()
 {
     File logfile;
-    bool r = SD.open("DATALOG.TXT", O_WRITE | O_CREAT | O_APPEND);
-    if (!r)
+    logfile = SD.open("DATALOG.TXT", O_WRITE | O_CREAT | O_APPEND);
+    if (!logfile)
     {
         statusLights.SetLoggingStatus(LOG_DISABLED);
         statusLights.SendStatusLights();
