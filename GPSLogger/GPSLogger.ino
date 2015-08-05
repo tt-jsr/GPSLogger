@@ -5,72 +5,15 @@
 #include "SPI.h"
 
 #include <SoftwareSerial.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_SSD1306.h"
+#include "display.h"
 
 #include "JSD.h"
 #include "Thread.h"
+#include "OneTime.h"
 #include "ThreadController.h"
 #include "GPS.h"
-
-SoftwareSerial mySerial(8, 7);
-GPS gps(&mySerial);
-
-enum LoggingStatus
-{
-  LOG_DISABLED = 0,
-  LOG_ENABLED = 1,
-  LOG_WRITING = 2
-};
-
-class StatusLights
-{
-public:
-    StatusLights()
-    : m_leds(0xff)
-    {
-        SetFixStatus(false);
-        SetLoggingStatus(LOG_DISABLED);
-    }
-    void SetLoggingStatus(int loggingStatus)
-    {
-      bitSet(m_leds, 0);
-      bitSet(m_leds, 1);
-      bitSet(m_leds, 2);
-      
-      switch(loggingStatus)
-      {
-        case LOG_DISABLED:
-          bitClear(m_leds, 0);
-          break;
-        case LOG_ENABLED:
-          bitClear(m_leds, 1);
-          break;
-        case LOG_WRITING:
-          bitClear(m_leds, 2);
-          break;
-      }
-    }
-    void SetFixStatus(bool b)
-    {
-      bitSet(m_leds, 4); // green
-      bitSet(m_leds, 3);
-      if (b)
-        bitClear(m_leds, 4);
-      else
-        bitClear(m_leds, 3);
-    }
-    void SendStatusLights()
-    {
-      digitalWrite(PIN_SR_LATCH, LOW);
-      SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-      SPI.transfer(m_leds);
-      SPI.endTransaction();
-      digitalWrite(PIN_SR_LATCH, HIGH);
-    }
-private:
-    byte m_leds;
-};
-
-StatusLights statusLights;
 
 enum {
     LOOP_DEFAULT
@@ -78,145 +21,118 @@ enum {
     ,LOOP_DISPLAY
 };
 
-byte runLoop = LOOP_DISPLAY;
-
-File *pLogfile = NULL;
-bool openFailed = false;
-
-#define LOG_INTERVAL  10000 // in milliseconds
-
 // This uses the very nice AuduinoThread library
 // https://github.com/ivanseidel/ArduinoThread
 
 class ButtonThread: public Thread
 {
 public:
-    void setup()
-    {
-      pinMode(PIN_NAV_LEFT, INPUT);
-      digitalWrite(PIN_NAV_LEFT, HIGH);
-      pinMode(PIN_NAV_RIGHT, INPUT);
-      digitalWrite(PIN_NAV_RIGHT, HIGH);
-      pinMode(PIN_OE_ENABLE, OUTPUT);
-      digitalWrite(PIN_OE_ENABLE, LOW);
-      pinMode(PIN_SR_LATCH, OUTPUT);
-      pinMode(PIN_NAV_UP, INPUT);
-      digitalWrite(PIN_NAV_UP, HIGH);
-      pinMode(PIN_NAV_DOWN, INPUT);
-      digitalWrite(PIN_NAV_DOWN, HIGH);
-      pinMode(PIN_NAV_SEL, INPUT);
-      digitalWrite(PIN_NAV_SEL, HIGH);
-      pinMode(PIN_BDISP, INPUT_PULLUP);
-
-      setInterval(500);
-    }
-    void execute()
-    {
-        if (shouldRun())
-           run();
-    }
+    void setup();
+    void execute();
 private:
-	void run()
-    {
-        if (digitalRead(PIN_BUT_DISP) == LOW)
-        {
-            switch(runLoop)
-            {
-            case LOOP_DEFAULT:
-                runLoop = LOOP_DISPLAY;
-                break;
-            case LOOP_DISPLAY:
-                runLoop = LOOP_LOGGING;
-                break;
-            case LOOP_LOGGING:
-                runLoop = LOOP_DISPLAY;
-                break;
-            }
-        }
-		runned();
-	}
+	void run();
 };
 
-ButtonThread buttonThread;
-
-int numrecs = 0;
-unsigned long resetStatusLight = ~0;
-unsigned long readyRMC = 0;
-unsigned long readyGGA = 0;
-void field_callback(char *p)
+class TurnOffWriteStatus : public OneTime
 {
-    //Serial.print(p);
-    if (resetStatusLight < millis())
-    {
-        statusLights.SetLoggingStatus(LOG_ENABLED);
-        statusLights.SendStatusLights();
-        resetStatusLight = ~0;
-    }
-    if (pLogfile == NULL)
-        return;
+public:
+    void setup();
+    void execute();
+private:
+    void run();
+};
 
-    if (strlen(p) > 6)
+
+class RMCThread: public Thread
+{
+public:
+    void setup();
+    void execute(char *p);
+private:
+	void run(char *p);
+};
+
+class GGAThread: public Thread
+{
+public:
+    void setup();
+    void execute(char *p);
+private:
+	void run(char *p);
+};
+
+
+SoftwareSerial mySerial(8, 7);
+GPS gps(&mySerial);
+StatusLights statusLights;
+byte runLoop = LOOP_DISPLAY;
+File *pLogfile = NULL;
+bool openFailed = false;
+GPSDisplay *pDisplay = NULL;
+int numrecs = 0;
+int LOG_INTERVAL = 10000;
+
+ButtonThread buttonThread;
+RMCThread rmcThread;
+GGAThread ggaThread;
+TurnOffWriteStatus turnOffWriteStatus;
+
+void sentence_callback(char *sentence)
+{
+    if (strlen(sentence) > 6)
     {
-        if ((strncmp(p, "$GPRMC", 6) == 0) && readyRMC < millis())
+        if ((strncmp(sentence, "$GPRMC", 6) == 0))
         {
-            statusLights.SetLoggingStatus(LOG_WRITING);
-            statusLights.SendStatusLights();
-            //Serial.print(p);
-            pLogfile->write(p);
-            resetStatusLight = millis() + 500;
-            readyRMC = millis() + LOG_INTERVAL;
-            ++numrecs;
+            rmcThread.execute(sentence);
         }
-        if ((strncmp(p, "$GPGGA", 6) == 0) && readyGGA < millis())
+        if ((strncmp(sentence, "$GPGGA", 6) == 0))
         {
-            statusLights.SetLoggingStatus(LOG_WRITING);
-            statusLights.SendStatusLights();
-            //Serial.print(p);
-            pLogfile->write(p);
-            resetStatusLight = millis() + 500;
-            readyGGA = millis() + LOG_INTERVAL;
-            ++numrecs;
+            ggaThread.execute(sentence);
         }
     }
 }
 
 void setup() {
-    Serial.begin(9600);
     buttonThread.setup();
+    rmcThread.setup();
+    ggaThread.setup();
+    turnOffWriteStatus.setup();
 
-    /**** GPS SETUP *****/
-    // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
-    gps.begin(4800);
-
-    //gps.sendCommand(PMTK_SET_BAUD_4800);
-    //gps.begin(4800);
-    // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
-    gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-    // uncomment this line to turn on only the "minimum recommended" data
-
-    // Set the update rate
-    gps.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // Every 1 secs update rate
-
-    // Request updates on antenna status, comment out to keep quiet
-    //gps.sendCommand(PGCMD_ANTENNA);
-
-    SD.begin(SD_CS);
+    gps.setup(4800);
     statusLights.SetLoggingStatus(LOG_DISABLED);
     statusLights.SetFixStatus(false);
-    statusLights.SendStatusLights();
-    gps.register_field_callback(field_callback);
+    pLogfile = NULL;
+    gps.register_sentence_callback(sentence_callback);
+    delay(20);
+}
+
+bool commonLoopStuff()
+{
+    bool rtn = false;
+    if (gps.isDataAvailable())
+    {
+        statusLights.SetFixStatus(gps.fix);
+        gps.clearDataAvailable();
+        rtn = true;
+    }
+    buttonThread.execute();
+    turnOffWriteStatus.execute();
+    if (serialEventRun) serialEventRun();
+    return rtn;
 }
 
 void loggingLoop()
 {
-    File logfile;
+    bool fix(false);
+
     cache_t cache;
     SdVolume::SetCache(cache);
+    SD.begin(SD_CS);
+    File logfile;
     logfile = SD.open("DATALOG.TXT", O_WRITE | O_CREAT | O_APPEND);
     if (!logfile)
     {
         statusLights.SetLoggingStatus(LOG_DISABLED);
-        statusLights.SendStatusLights();
         openFailed = true;
         runLoop = LOOP_DISPLAY;
         return;
@@ -224,45 +140,181 @@ void loggingLoop()
     openFailed = false;
     pLogfile = &logfile;
     statusLights.SetLoggingStatus(LOG_ENABLED);
-    statusLights.SendStatusLights();
     while (runLoop == LOOP_LOGGING)
     {
-        if (gps.isDataAvailable())
+        commonLoopStuff();
+        if (gps.fix==true && fix==false)
         {
-            statusLights.SetFixStatus(gps.fix);
-            statusLights.SendStatusLights();
-            gps.clearDataAvailable();
+            fix = gps.fix;
+            logfile.println("Lost fix");
         }
-        buttonThread.execute();
-        if (serialEventRun) serialEventRun();
+        if (gps.fix == false && fix == true)
+        {
+            fix = gps.fix;
+            logfile.println("Acquired fix");
+        }
     }
     logfile.close();
     pLogfile = NULL;
     statusLights.SetLoggingStatus(LOG_DISABLED);
-    statusLights.SendStatusLights();
 }
 
 void displayLoop()
 {
+    GPSDisplay display;
+    display.setup();
+    delay(10);
+    //display.splashScreen();
+    pDisplay = &display;
+    gps.setdisplay(&display);
     pLogfile = NULL;
+    if (openFailed)
+    {
+        display.failedToOpenLogfile();
+        delay(1000);
+        openFailed = false;
+    }
     while (runLoop == LOOP_DISPLAY)
     {
-        if (gps.isDataAvailable())
+        if (commonLoopStuff())
         {
-            gps.clearDataAvailable();
-            statusLights.SetFixStatus(gps.fix);
-            statusLights.SendStatusLights();
+            display.refresh();
         }
-        buttonThread.execute();
-        if (serialEventRun) serialEventRun();
     }
+    pDisplay = NULL;
+    gps.setdisplay(NULL);
 }
 
 void loop() {
     buttonThread.execute();
     if (runLoop == LOOP_LOGGING)
+    {
         loggingLoop();
+    }
     if (runLoop == LOOP_DISPLAY)
+    {
         displayLoop();
+    }
+}
+/****************************************************************/
+void ButtonThread::setup()
+{
+  pinMode(PIN_NAV_LEFT, INPUT);
+  digitalWrite(PIN_NAV_LEFT, HIGH);
+  pinMode(PIN_NAV_RIGHT, INPUT);
+  digitalWrite(PIN_NAV_RIGHT, HIGH);
+  pinMode(PIN_OE_ENABLE, OUTPUT);
+  digitalWrite(PIN_OE_ENABLE, LOW);
+  pinMode(PIN_SR_LATCH, OUTPUT);
+  pinMode(PIN_NAV_UP, INPUT);
+  digitalWrite(PIN_NAV_UP, HIGH);
+  pinMode(PIN_NAV_DOWN, INPUT);
+  digitalWrite(PIN_NAV_DOWN, HIGH);
+  pinMode(PIN_NAV_SEL, INPUT);
+  digitalWrite(PIN_NAV_SEL, HIGH);
+  pinMode(PIN_BDISP, INPUT_PULLUP);
+
+  setInterval(500);
+}
+void ButtonThread::execute()
+{
+    if (shouldRun())
+       run();
 }
 
+void ButtonThread::run()
+{
+    if (runLoop == LOOP_DISPLAY)
+    {
+        if (digitalRead(PIN_NAV_UP) == LOW)
+            if (pDisplay) pDisplay->firstScreen();
+        if (digitalRead(PIN_NAV_DOWN) == LOW)
+            if (pDisplay) pDisplay->lastScreen();
+        if (digitalRead(PIN_NAV_LEFT) == LOW)
+            if (pDisplay) pDisplay->prevScreen();
+        if (digitalRead(PIN_NAV_RIGHT) == LOW)
+            if (pDisplay) pDisplay->nextScreen();
+    }
+    if (digitalRead(PIN_BUT_DISP) == LOW)
+    {
+        switch(runLoop)
+        {
+        case LOOP_DEFAULT:
+            runLoop = LOOP_DISPLAY;
+            break;
+        case LOOP_DISPLAY:
+            runLoop = LOOP_LOGGING;
+            if (pDisplay) pDisplay->runningLogging();
+            break;
+        case LOOP_LOGGING:
+            runLoop = LOOP_DISPLAY;
+            break;
+        }
+    }
+    runned();
+}
+
+/**********************************************************/
+void TurnOffWriteStatus::setup() 
+{
+}
+
+void TurnOffWriteStatus::execute()
+{
+    if (shouldRun())
+        run();
+}
+
+void TurnOffWriteStatus::run()
+{
+    statusLights.SetLoggingStatus(LOG_ENABLED);
+    runned();
+}
+
+/**********************************************************/
+
+void RMCThread::setup()
+{
+  setInterval(LOG_INTERVAL);
+}
+
+void RMCThread::execute(char *p)
+{
+    if (shouldRun())
+       run(p);
+}
+
+void RMCThread::run(char *sentence)
+{
+    if (pLogfile == NULL)
+        return;
+    statusLights.SetLoggingStatus(LOG_WRITING);
+    pLogfile->write(sentence);
+    turnOffWriteStatus.milliSecondsFromNow(500);
+    ++numrecs;
+    runned();
+}
+
+/**********************************************************/
+
+void GGAThread::setup()
+{
+  setInterval(LOG_INTERVAL);
+}
+
+void GGAThread::execute(char *p)
+{
+    if (shouldRun())
+       run(p);
+}
+
+void GGAThread::run(char *sentence)
+{
+    if (pLogfile == NULL)
+        return;
+    statusLights.SetLoggingStatus(LOG_WRITING);
+    pLogfile->write(sentence);
+    turnOffWriteStatus.milliSecondsFromNow(500);
+    ++numrecs;
+    runned();
+}

@@ -3,9 +3,9 @@
 #include "Arduino.h"
 #include "avr/pgmspace.h"
 #include "SPI.h"
-//#include "Adafruit_GFX.h"
-//#include "Adafruit_SSD1306.h"
-//#include "display.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_SSD1306.h"
+#include "display.h"
 
 #include <SoftwareSerial.h>
 #include "JSD.h"
@@ -61,17 +61,17 @@ bool GPS::parseGGA(char *field)
    {
        case FIELD_TIME:
            {
-            //char *p = field;
-            //float timef = atof(p);
-            //uint32_t time = timef;
-            //if (pDisplay)
-            //{
-                //pDisplay->hour = time / 10000;
-                //pDisplay->minute = (time % 10000) / 100;
-                //pDisplay->seconds = (time % 100);
-//
-                //pDisplay->milliseconds = fmod(timef, 1.0) * 1000;
-            //}
+            char *p = field;
+            float timef = atof(p);
+            uint32_t time = timef;
+            if (pDisplay)
+            {
+                pDisplay->hour = time / 10000;
+                pDisplay->minute = (time % 10000) / 100;
+                pDisplay->seconds = (time % 100);
+
+                pDisplay->milliseconds = fmod(timef, 1.0) * 1000;
+            }
             currentField = FIELD_LATITUDE;
            }
            break;
@@ -89,25 +89,25 @@ bool GPS::parseGGA(char *field)
            break;
         case FIELD_FIXQUALITY:
            {
-               //if (pDisplay) pDisplay->fixquality = atoi(field);
+               if (pDisplay) pDisplay->fixquality = atoi(field);
                currentField = FIELD_SATELLITES;
            }
            break;
         case FIELD_SATELLITES:
            {
-               //if (pDisplay) pDisplay->satellites = atoi(field);
+               if (pDisplay) pDisplay->satellites = atoi(field);
                currentField = FIELD_HDOP;
            }
            break;
         case FIELD_HDOP:
            {
-               //if (pDisplay) pDisplay->HDOP = atof(field);
+               if (pDisplay) pDisplay->HDOP = atof(field);
                currentField = FIELD_ALTITUDE;
            }
            break;
         case FIELD_ALTITUDE:
            {
-               //if (pDisplay) pDisplay->altitude = atof(field);
+               if (pDisplay) pDisplay->altitude = atof(field);
                currentField = FIELD_ANTENNA_UNITS;
            }
            break;
@@ -141,17 +141,17 @@ bool GPS::parseRMC(char *field)
    {
        case FIELD_TIME:
            {
-            //char *p = field;
-            //float timef = atof(p);
-            //uint32_t time = timef;
-            //if (pDisplay)
-            //{
-                //pDisplay->hour = time / 10000;
-                //pDisplay->minute = (time % 10000) / 100;
-                //pDisplay->seconds = (time % 100);
-//
-                //pDisplay->milliseconds = fmod(timef, 1.0) * 1000;
-            //}
+            char *p = field;
+            float timef = atof(p);
+            uint32_t time = timef;
+            if (pDisplay)
+            {
+                pDisplay->hour = time / 10000;
+                pDisplay->minute = (time % 10000) / 100;
+                pDisplay->seconds = (time % 100);
+
+                pDisplay->milliseconds = fmod(timef, 1.0) * 1000;
+            }
             currentField = FIELD_VALIDITY;
            }
            break;
@@ -170,111 +170,123 @@ bool GPS::parseRMC(char *field)
            break;
        case FIELD_LATITUDE:
            {
-              //char *p = field;
-              //char degreebuff[10];
-              //strncpy(degreebuff, p, 2);
-              //p += 2;
-              //degreebuff[2] = '\0';
-              //int32_t degree = atol(degreebuff) * 10000000;
-              //strncpy(degreebuff, p, 2); // minutes
-              //p += 3; // skip decimal point
-              //strncpy(degreebuff + 2, p, 4);
-              //degreebuff[6] = '\0';
-              //long minutes = 50 * atol(degreebuff) / 3;
-              //float tmp = degree / 100000 + minutes * 0.000006F;
-              //if (pDisplay)
-              //{
-                  //pDisplay->latitude = (tmp-100*int(tmp/100))/60.0;
-                  //pDisplay->latitude += int(tmp/100);
-              //}
+              char *p = field;
+              char degreebuff[10];
+              /*
+              strncpy(degreebuff, p, 2);
+              degreebuff[2] = '\0';
+              if (pDisplay) pDisplay->latDegrees = atol(degreebuff);
+              p += 2;
+              strncpy(degreebuff, p, 2);
+              degreebuff[2] = '\0';
+              if (pDisplay) pDisplay->latMinutes = atol(degreebuff);
+              p += 3;
+*/
+              
+              p = field;
+              strncpy(degreebuff, p, 2);
+              p += 2;
+              degreebuff[2] = '\0';
+              int32_t degree = atol(degreebuff) * 10000000;
+              strncpy(degreebuff, p, 2); // minutes
+              p += 3; // skip decimal point
+              strncpy(degreebuff + 2, p, 4);
+              degreebuff[6] = '\0';
+              long minutes = 50 * atol(degreebuff) / 3;
+              float tmp = degree / 100000 + minutes * 0.000006F;
+              if (pDisplay)
+              {
+                  pDisplay->latitude = (tmp-100*int(tmp/100))/60.0;
+                  pDisplay->latitude += int(tmp/100);
+              }
               currentField = FIELD_LAT_NS;
            }
            break;
        case FIELD_LAT_NS:
            {
-              //if (field[0] == 'S') 
-              //{
-                  //if (pDisplay)
-                  //{
-                      //pDisplay->latitude *= -1.0;
-                      //pDisplay->lat_ns = 'S';
-                  //}
-              //}
-              //else if (field[0] == 'N') 
-              //{
-                  //if (pDisplay) pDisplay->lat_ns = 'N';
-              //}
-              //else if (field[0] == '\0') 
-              //{
-                  //if (pDisplay) pDisplay->lat_ns = 0;
-              //}
+              if (field[0] == 'S') 
+              {
+                  if (pDisplay)
+                  {
+                      pDisplay->latitude *= -1.0;
+                      pDisplay->lat_ns = 'S';
+                  }
+              }
+              else if (field[0] == 'N') 
+              {
+                  if (pDisplay) pDisplay->lat_ns = 'N';
+              }
+              else if (field[0] == '\0') 
+              {
+                  if (pDisplay) pDisplay->lat_ns = 0;
+              }
               currentField = FIELD_LONGITUDE;
            }
            break;
        case FIELD_LONGITUDE:
            {
-              //char degreebuff[10];
-              //char *p = field;
-              //strncpy(degreebuff, p, 3);
-              //p += 3;
-              //degreebuff[3] = '\0';
-              //int32_t degree = atol(degreebuff) * 10000000;
-              //strncpy(degreebuff, p, 2); // minutes
-              //p += 3; // skip decimal point
-              //strncpy(degreebuff + 2, p, 4);
-              //degreebuff[6] = '\0';
-              //long minutes = 50 * atol(degreebuff) / 3;
-              //float tmp = degree / 100000 + minutes * 0.000006F;
-              //if (pDisplay)
-              //{
-                  //pDisplay->longitude = (tmp-100*int(tmp/100))/60.0;
-                  //pDisplay->longitude += int(tmp/100);
-              //}
+              char degreebuff[10];
+              char *p = field;
+              strncpy(degreebuff, p, 3);
+              p += 3;
+              degreebuff[3] = '\0';
+              int32_t degree = atol(degreebuff) * 10000000;
+              strncpy(degreebuff, p, 2); // minutes
+              p += 3; // skip decimal point
+              strncpy(degreebuff + 2, p, 4);
+              degreebuff[6] = '\0';
+              long minutes = 50 * atol(degreebuff) / 3;
+              float tmp = degree / 100000 + minutes * 0.000006F;
+              if (pDisplay)
+              {
+                  pDisplay->longitude = (tmp-100*int(tmp/100))/60.0;
+                  pDisplay->longitude += int(tmp/100);
+              }
               currentField = FIELD_LON_EW;
            }
            break;
        case FIELD_LON_EW:
            {
-              //if (field[0] == 'W') 
-              //{
-                  //if (pDisplay)
-                  //{
-                      //pDisplay->longitude *= -1.0;
-                      ////pDisplay->lon_ew = 'W';
-                  //}
-              //}
-              //else if (field[0] == 'E') 
-              //{
-                  //if (pDisplay) pDisplay->lon_ew = 'E';
-              //}
-              //else if (field[0] == '\0') 
-              //{
-                  //if (pDisplay) pDisplay->lon_ew = 0;
-              //}
+              if (field[0] == 'W') 
+              {
+                  if (pDisplay)
+                  {
+                      pDisplay->longitude *= -1.0;
+                      //pDisplay->lon_ew = 'W';
+                  }
+              }
+              else if (field[0] == 'E') 
+              {
+                  if (pDisplay) pDisplay->lon_ew = 'E';
+              }
+              else if (field[0] == '\0') 
+              {
+                  if (pDisplay) pDisplay->lon_ew = 0;
+              }
               currentField = FIELD_SPEED;
            }
            break;
         case FIELD_SPEED:
            {
-               //if (pDisplay) pDisplay->speed = atof(field);
+               if (pDisplay) pDisplay->speed = atof(field);
                currentField = FIELD_BEARING;
            }
            break;
         case FIELD_BEARING:
            {
-               //if (pDisplay) pDisplay->bearing = atof(field);
+               if (pDisplay) pDisplay->bearing = atof(field);
                currentField = FIELD_DATE;
            }
            break;
         case FIELD_DATE:
            {
-              //uint32_t fulldate = atof(field);
-              //if (pDisplay)
-              //{
-                  //pDisplay->day = fulldate / 10000;
-                  //pDisplay->month = (fulldate % 10000) / 100;
-                  //pDisplay->year = (fulldate % 100);
-              //}
+              uint32_t fulldate = atof(field);
+              if (pDisplay)
+              {
+                  pDisplay->day = fulldate / 10000;
+                  pDisplay->month = (fulldate % 10000) / 100;
+                  pDisplay->year = (fulldate % 100);
+              }
               currentField = FIELD_MAGVAR;
            }
            break;
@@ -345,8 +357,8 @@ void GPS::read(void)
     {
         linebuf[lineidx] = 0;
         lineidx = 0;
-        if (fieldCallback)
-            fieldCallback(linebuf);
+        if (sentenceCallback)
+            sentenceCallback(linebuf);
         char *p = linebuf;
         while (*p)
         {
@@ -400,26 +412,43 @@ void GPS::common_init(void) {
   rmcready   = false;
   ggaready   = false;
   paused      = false;
+  pDisplay = NULL;
   fieldidx     = 0;
   currentField = FIELD_UNKNOWN;
   currentSentence = SENTENCE_UNKNOWN;
-  fieldCallback = NULL;
+  sentenceCallback = NULL;
   fix = false;
 }
 
-void GPS::begin(uint16_t baud)
+void GPS::setdisplay(GPSDisplay *p)
+{
+    pDisplay = p;
+}
+
+void GPS::setup(uint16_t baud)
 {
     pSerial->begin(baud);
-  delay(10);
+    delay(10);
+    //gps.sendCommand(PMTK_SET_BAUD_4800);
+    //gps.begin(4800);
+    // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+    sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+    // uncomment this line to turn on only the "minimum recommended" data
+
+    // Set the update rate
+    sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // Every 1 secs update rate
+
+    // Request updates on antenna status, comment out to keep quiet
+    //gps.sendCommand(PGCMD_ANTENNA);
 }
 
 void GPS::sendCommand(const char *str) {
     pSerial->println(str);
 }
 
-void GPS::register_field_callback(FieldCallback cb)
+void GPS::register_sentence_callback(SentenceCallback cb)
 {
-    fieldCallback = cb;
+    sentenceCallback = cb;
 }
 
 boolean GPS::isDataAvailable() {

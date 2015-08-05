@@ -60,11 +60,11 @@
 // how long to wait when we're looking for a response
 #define MAXWAITSENTENCE 5
 
-typedef void (*FieldCallback)(char *);
+typedef void (*SentenceCallback)(char *);
 
 class GPS {
  public:
-  void begin(uint16_t baud); 
+  void setup(uint16_t baud); 
 
 #ifdef GPS_USES_SOFTWARE_SERIAL
   GPS(SoftwareSerial *ser); // Constructor when using SoftwareSerial
@@ -75,13 +75,14 @@ class GPS {
   boolean isDataAvailable();
   void clearDataAvailable();
 
+  void setdisplay(GPSDisplay *);
   void sendCommand(const char *);
   void pause(boolean b);
   boolean wakeup(void);
   boolean standby(void);
 
   bool fix;
-  void register_field_callback(FieldCallback);
+  void register_sentence_callback(SentenceCallback);
   byte sentenceType() {return currentSentence;}
  private:
   void common_init(void);
@@ -95,7 +96,8 @@ class GPS {
   byte currentField;
   boolean paused;
   byte currentSentence;
-  FieldCallback fieldCallback;
+  SentenceCallback sentenceCallback;
+  GPSDisplay *pDisplay;
 #ifdef GPS_USES_SOFTWARE_SERIAL
   SoftwareSerial *pSerial;
 #else
