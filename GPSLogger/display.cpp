@@ -20,13 +20,14 @@ const char string9[] PROGMEM = "      HDOP: %f";
 const char string10[] PROGMEM = "Failed to open file";
 const char string11[] PROGMEM = "Logging...";
 const char string12[] PROGMEM = "#Records: %d\n";
-const char string13[] PROGMEM = "Distance: %f ft";
-const char string14[] PROGMEM = "Distance: %f mi";
-const char string15[] PROGMEM = "%2d/%2d/20%d\n%2d:%2d:%2d UTC";
+const char string13[] PROGMEM = "Distance: %f ft\n";
+const char string14[] PROGMEM = "Distance: %f mi\n";
+const char string15[] PROGMEM = "Run Time: %dh %dm %ds";
+const char string16[] PROGMEM = "%2d/%2d/20%d\n%2d:%2d:%2d UTC";
 
 const char *const string_table[] PROGMEM = {
     string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11
-    , string12, string13, string14, string15
+    , string12, string13, string14, string15, string16
 };
 
 enum STRING_ID {
@@ -44,6 +45,7 @@ enum STRING_ID {
     , ID_NUMRECS
     , ID_DISTANCE_FT
     , ID_DISTANCE_MI
+    , ID_RUNTIME
     , ID_DATETIME
 };
 
@@ -263,7 +265,7 @@ void GPSDisplay::setScreen(int screen)
 void GPSDisplay::runningLogging()
 {
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
+    m_display.setCursor(32, 12);
     aprintf(m_display, ID_RUN_LOGGING);
     m_display.display();
 }
@@ -349,6 +351,13 @@ void GPSDisplay::displayTrack()
     {
         aprintf(m_display, ID_DISTANCE_FT, distance*3.28984);
     }
+    unsigned long now = millis();
+    int hours = millis()/3600000;
+    now -= hours * 3600000;
+    int min = now/60000;
+    now -= min*60000;
+    int sec = now/1000;
+    aprintf(m_display, ID_RUNTIME, hours, min, sec);
 }
 
 void GPSDisplay::displayTime()

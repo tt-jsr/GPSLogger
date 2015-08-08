@@ -945,8 +945,8 @@ download the executable.-->
 		<TEXT pos='23.00000,27.00000' direction='3' font='3' color='000000'>9 Display D/C</TEXT>
 		<TEXT pos='23.00000,33.00000' direction='3' font='3' color='000000'>6 Display Select</TEXT>
 		<TEXT pos='23.00000,37.00000' direction='3' font='3' color='000000'>5 SR Latch</TEXT>
-		<TEXT pos='23.00000,40.00000' direction='3' font='3' color='000000'>3 Indicators on/off</TEXT>
-		<TEXT pos='23.00000,43.00000' direction='3' font='3' color='000000'>2 Indicators On/Off button</TEXT>
+		<TEXT pos='23.00000,43.00000' direction='3' font='3' color='000000'>3 Indicators on/off (not implemented)</TEXT>
+		<TEXT pos='23.00000,46.00000' direction='3' font='3' color='000000'>2 Display switching</TEXT>
 		<POWER pos='241.00000,24.00000' which='4' direction='1'></POWER>
 		<POWER pos='241.00000,33.00000' which='4' direction='1'></POWER>
 		<POWER pos='242.00000,42.00000' which='4' direction='1'></POWER>
@@ -982,8 +982,9 @@ download the executable.-->
 		<WIRE a='82.40000,99.40000' b='139.00000,99.40000'/>
 		<WIRE a='139.00000,99.40000' b='139.00000,65.00000'/>
 		<WIRE a='139.00000,65.00000' b='130.00000,65.00000'/>
-		<POWER pos='178.00000,76.00000' which='3' direction='0'>5v</POWER>
-		<WIRE a='178.00000,76.00000' b='178.00000,83.00000'/>
-		<WIRE a='178.00000,83.00000' b='187.00000,83.00000'/>
+		<WIRE a='130.00000,62.00000' b='176.00000,62.00000'/>
+		<WIRE a='176.00000,62.00000' b='176.00000,83.00000'/>
+		<WIRE a='176.00000,83.00000' b='187.00000,83.00000'/>
+		<TEXT pos='23.00000,40.00000' direction='3' font='3' color='000000'>4 Display Rest</TEXT>
 	</TinyCAD>
 </TinyCADSheets>

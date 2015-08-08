@@ -71,6 +71,7 @@ bool openFailed = false;
 GPSDisplay *pDisplay = NULL;
 int numrecs = 0;
 int LOG_INTERVAL = 5000;
+bool fix = false;
 
 ButtonThread buttonThread;
 RMCThread rmcThread;
@@ -112,10 +113,23 @@ bool commonLoopStuff()
     bool rtn = false;
     if (gps.isDataAvailable())
     {
-        statusLights.SetFixStatus(gps.fix);
         gps.clearDataAvailable();
         gps.calculateDistance();
         rtn = true;
+        if (gps.fix==true && fix==false)
+        {
+            statusLights.SetFixStatus(gps.fix);
+            fix = gps.fix;
+            if (pLogfile) pLogfile->println("Lost fix");
+            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
+        }
+        if (gps.fix == false && fix == true)
+        {
+            statusLights.SetFixStatus(gps.fix);
+            fix = gps.fix;
+            if (pLogfile) pLogfile->println("Acquired fix");
+            if (pDisplay) pDisplay->setScreen(DISP_SATFIX);
+        }
     }
     buttonThread.execute();
     turnOffWriteStatus.execute();
@@ -125,7 +139,6 @@ bool commonLoopStuff()
 
 void loggingLoop()
 {
-    bool fix(false);
 
     cache_t cache;
     SdVolume::SetCache(cache);
@@ -145,18 +158,6 @@ void loggingLoop()
     while (runLoop == LOOP_LOGGING)
     {
         commonLoopStuff();
-        if (gps.fix==true && fix==false)
-        {
-            fix = gps.fix;
-            logfile.println("Lost fix");
-            if (pDisplay) pDisplay->setScreen(DISP_SATFIX);
-        }
-        if (gps.fix == false && fix == true)
-        {
-            fix = gps.fix;
-            logfile.println("Acquired fix");
-            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
-        }
     }
     logfile.close();
     pLogfile = NULL;
@@ -178,10 +179,11 @@ void displayLoop()
         delay(1000);
         openFailed = false;
     }
-    if (gps.fix == false)
+    if (fix == false)
     {
         display.setScreen(DISP_SATFIX);
     }
+    display.numrecs = numrecs;
     while (runLoop == LOOP_DISPLAY)
     {
         if (commonLoopStuff())
@@ -235,9 +237,9 @@ void ButtonThread::run()
     if (runLoop == LOOP_DISPLAY)
     {
         if (digitalRead(PIN_NAV_UP) == LOW)
-            if (pDisplay) pDisplay->firstScreen();
+            if (pDisplay) pDisplay->setScreen(DISP_TRACK);
         if (digitalRead(PIN_NAV_DOWN) == LOW)
-            if (pDisplay) pDisplay->lastScreen();
+            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
         if (digitalRead(PIN_NAV_LEFT) == LOW)
             if (pDisplay) pDisplay->prevScreen();
         if (digitalRead(PIN_NAV_RIGHT) == LOW)
