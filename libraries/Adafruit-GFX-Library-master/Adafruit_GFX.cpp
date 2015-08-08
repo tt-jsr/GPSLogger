@@ -470,9 +470,22 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
   }
 }
 
+void Adafruit_GFX::setTextCursor(int16_t x, int16_t y) {
+  cursor_x = textsize*6;
+  cursor_y = (textsize*8)*y;
+}
+
 void Adafruit_GFX::setCursor(int16_t x, int16_t y) {
   cursor_x = x;
   cursor_y = y;
+}
+
+int16_t Adafruit_GFX::getTextCursorX(void) const {
+  return cursor_x/(textsize*6);
+}
+
+int16_t Adafruit_GFX::getTextCursorY(void) const {
+  return cursor_y/(textsize*8);
 }
 
 int16_t Adafruit_GFX::getCursorX(void) const {

@@ -55,6 +55,7 @@ class Adafruit_GFX : public Print {
     drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color,
       uint16_t bg, uint8_t size),
     setCursor(int16_t x, int16_t y),
+    setTextCursor(int16_t x, int16_t y),
     setTextColor(uint16_t c),
     setTextColor(uint16_t c, uint16_t bg),
     setTextSize(uint8_t s),
@@ -76,6 +77,9 @@ class Adafruit_GFX : public Print {
   // get current cursor position (get rotation safe maximum values, using: width() for x, height() for y)
   int16_t getCursorX(void) const;
   int16_t getCursorY(void) const;
+
+  int16_t getTextCursorX(void) const;
+  int16_t getTextCursorY(void) const;
 
  protected:
   const int16_t

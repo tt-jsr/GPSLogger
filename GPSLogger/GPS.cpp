@@ -171,34 +171,15 @@ bool GPS::parseRMC(char *field)
        case FIELD_LATITUDE:
            {
               char *p = field;
-              char degreebuff[10];
-              /*
-              strncpy(degreebuff, p, 2);
-              degreebuff[2] = '\0';
-              if (pDisplay) pDisplay->latDegrees = atol(degreebuff);
+              char buf[10];
+              strncpy(buf, p, 2);
+              buf[2] = '\0';
+              int degrees = (int)atol(buf);
+              if (pDisplay) pDisplay->latDegrees = degrees;
               p += 2;
-              strncpy(degreebuff, p, 2);
-              degreebuff[2] = '\0';
-              if (pDisplay) pDisplay->latMinutes = atol(degreebuff);
-              p += 3;
-*/
-              
-              p = field;
-              strncpy(degreebuff, p, 2);
-              p += 2;
-              degreebuff[2] = '\0';
-              int32_t degree = atol(degreebuff) * 10000000;
-              strncpy(degreebuff, p, 2); // minutes
-              p += 3; // skip decimal point
-              strncpy(degreebuff + 2, p, 4);
-              degreebuff[6] = '\0';
-              long minutes = 50 * atol(degreebuff) / 3;
-              float tmp = degree / 100000 + minutes * 0.000006F;
-              if (pDisplay)
-              {
-                  pDisplay->latitude = (tmp-100*int(tmp/100))/60.0;
-                  pDisplay->latitude += int(tmp/100);
-              }
+              float minutes = atof(p);
+              if (pDisplay) pDisplay->latMinutes = minutes;
+              currentLatitude = (float)degrees + minutes/60.0;
               currentField = FIELD_LAT_NS;
            }
            break;
@@ -208,9 +189,10 @@ bool GPS::parseRMC(char *field)
               {
                   if (pDisplay)
                   {
-                      pDisplay->latitude *= -1.0;
+                      pDisplay->latDegrees *= -1.0;
                       pDisplay->lat_ns = 'S';
                   }
+                  currentLatitude *= -1.0;
               }
               else if (field[0] == 'N') 
               {
@@ -225,23 +207,16 @@ bool GPS::parseRMC(char *field)
            break;
        case FIELD_LONGITUDE:
            {
-              char degreebuff[10];
+              char buf[10];
               char *p = field;
-              strncpy(degreebuff, p, 3);
+              strncpy(buf, p, 3);
+              buf[3] = '\0';
+              int degrees = (int)atol(buf);
+              if (pDisplay) pDisplay->lonDegrees = degrees;
               p += 3;
-              degreebuff[3] = '\0';
-              int32_t degree = atol(degreebuff) * 10000000;
-              strncpy(degreebuff, p, 2); // minutes
-              p += 3; // skip decimal point
-              strncpy(degreebuff + 2, p, 4);
-              degreebuff[6] = '\0';
-              long minutes = 50 * atol(degreebuff) / 3;
-              float tmp = degree / 100000 + minutes * 0.000006F;
-              if (pDisplay)
-              {
-                  pDisplay->longitude = (tmp-100*int(tmp/100))/60.0;
-                  pDisplay->longitude += int(tmp/100);
-              }
+              float minutes = atof(p);
+              if (pDisplay) pDisplay->lonMinutes = minutes;
+              currentLongitude = (float)degrees + minutes/60.0;
               currentField = FIELD_LON_EW;
            }
            break;
@@ -251,9 +226,10 @@ bool GPS::parseRMC(char *field)
               {
                   if (pDisplay)
                   {
-                      pDisplay->longitude *= -1.0;
-                      //pDisplay->lon_ew = 'W';
+                      pDisplay->lonDegrees *= -1.0;
+                      pDisplay->lon_ew = 'W';
                   }
+                  currentLongitude *= 1.0;
               }
               else if (field[0] == 'E') 
               {
@@ -263,6 +239,7 @@ bool GPS::parseRMC(char *field)
               {
                   if (pDisplay) pDisplay->lon_ew = 0;
               }
+
               currentField = FIELD_SPEED;
            }
            break;
@@ -304,27 +281,44 @@ bool GPS::parseRMC(char *field)
    }
    return true;
 }
+
+
 bool GPS::parse(char *field)
 {
-   if (strcmp(field, "$GPGGA") == 0)
-   {
-       currentSentence = SENTENCE_GGA;
-       currentField = FIELD_TIME;
+    if (strcmp(field, "$GPGGA") == 0)
+    {
+        currentSentence = SENTENCE_GGA;
+        currentField = FIELD_TIME;
 
-       return true;
-   }
-   else if (strcmp(field, "$GPRMC") == 0)
-   {
-       currentSentence = SENTENCE_RMC;
-       currentField = FIELD_TIME;
-       return true;
-   }
-   if (currentSentence == SENTENCE_GGA)
-       return parseGGA(field);
-   if (currentSentence == SENTENCE_RMC)
-       return parseRMC(field);
+        return true;
+    }
+    else if (strcmp(field, "$GPRMC") == 0)
+    {
+        currentSentence = SENTENCE_RMC;
+        currentField = FIELD_TIME;
+        return true;
+    }
+    if (currentSentence == SENTENCE_GGA)
+        return parseGGA(field);
+    if (currentSentence == SENTENCE_RMC)
+    {
+        bool b =  parseRMC(field);
+        if (fix && haveFirstLocation == false)
+        {
+            if (currentLatitude > 1.0)
+                lastLatitude = currentLatitude;
+            if (currentLongitude > 1.0)
+                lastLongitude = currentLongitude;
+            if (lastLatitude > 1.0 && lastLongitude > 1.0)
+            {
+                haveFirstLocation = true;
+            }
+        }
+        return b;
+    }
 
-   return false;
+
+    return false;
 }
 
 void GPS::endOfField()
@@ -345,13 +339,9 @@ void GPS::read(void)
         return;
     c = pSerial->read();
     linebuf[lineidx++] = c;
-    if (lineidx >= MAXLINELENGTH)
+    if (lineidx == (MAXLINELENGTH-1))
     {
-        linebuf[MAXLINELENGTH-3] = '\r';
-        linebuf[MAXLINELENGTH-2] = '\n';
-        linebuf[MAXLINELENGTH-1] = 0;
-        lineidx = MAXLINELENGTH-1;
-        c = '\n';
+        --lineidx;
     }
     if (c == '\n')
     {
@@ -418,6 +408,12 @@ void GPS::common_init(void) {
   currentSentence = SENTENCE_UNKNOWN;
   sentenceCallback = NULL;
   fix = false;
+  distance = 0.0;
+  lastLatitude = 0.0;
+  lastLongitude = 0.0;
+  currentLatitude = 0.0;
+  currentLongitude = 0.0;
+  haveFirstLocation = false;
 }
 
 void GPS::setdisplay(GPSDisplay *p)
@@ -469,6 +465,41 @@ void GPS::pause(boolean p) {
   paused = p;
 }
 
+double GPS::calculateDistance()
+{
+    if (fix == false || haveFirstLocation == false)
+    {
+        return distance;
+    }
+   
+    double d = calculateDistance(lastLatitude, lastLongitude, currentLatitude, currentLongitude);
+    if (d > 50.0)
+    {
+        distance += d;
+        lastLongitude = currentLongitude;
+        lastLatitude = currentLatitude;
+    }
+    if (pDisplay) pDisplay->distance = distance;
+    return distance;
+}
+
+double GPS::deg2rad(const double& d)
+{
+    return d * .0174532925; // pi/180
+}
+
+double GPS::calculateDistance(const double& lat1_, const double& lon1_, const double& lat2_, const double& lon2_)
+{
+    double R = 6371000.0;
+    double lat1 = deg2rad(lat1_);
+    double lat2 = deg2rad(lat2_);
+    double dlat = deg2rad(lat2_-lat1_);
+    double dlon = deg2rad(lon2_-lon1_);
+    double a = sin(dlat/2) * sin(dlat/2) + cos(lat1) * cos(lat2) * sin(dlon/2) * sin(dlon/2);
+    double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
+    return R * c;
+}
+
 // read a Hex value and return the decimal equivalent
 uint8_t GPS::parseHex(char c) {
     if (c < '0')
@@ -483,30 +514,3 @@ uint8_t GPS::parseHex(char c) {
     return 0;
 }
 
-// Standby Mode Switches
-boolean GPS::standby(void) {
-  /*
-  if (inStandbyMode) {
-    return false;  // Returns false if already in standby mode, so that you do not wake it up by sending commands to GPS
-  }
-  else {
-    inStandbyMode = true;
-    sendCommand(PMTK_STANDBY);
-    //return waitForSentence(PMTK_STANDBY_SUCCESS);  // don't seem to be fast enough to catch the message, or something else just is not working
-    return true;
-  }
-  */
-}
-
-boolean GPS::wakeup(void) {
-    /*
-  if (inStandbyMode) {
-   inStandbyMode = false;
-    sendCommand("");  // send byte to wake it up
-    return waitForSentence(PMTK_AWAKE);
-  }
-  else {
-      return false;  // Returns false if not in standby mode, nothing to wakeup
-  }
-  */
-}

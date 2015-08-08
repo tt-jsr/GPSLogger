@@ -8,6 +8,16 @@ enum LoggingStatus
   LOG_WRITING = 2
 };
 
+enum DisplayScreen {
+    DISP_BEGIN = 0,
+    DISP_LATLON = 1,
+    DISP_SPEEDBER = 2,
+    DISP_SATFIX = 3,
+    DISP_TIME = 4,
+    DISP_TRACK = 5,
+    DISP_END = 6
+};
+
 class StatusLights
 {
 public:
@@ -29,18 +39,15 @@ public:
     void lastScreen();
     void nextScreen();
     void prevScreen();
+    void setScreen(int);
     void refresh();
     void runningLogging();
     void failedToOpenLogfile();
 public:
-    float latitude;
-    byte latDegrees;
-    byte latMinute;
-    byte latSeconds;
-    float longitude;
-    byte lonDegrees;
-    byte lonMinutes;
-    byte lonSeconds;
+    int latDegrees;
+    float latMinutes;
+    int lonDegrees;
+    float lonMinutes;
     float altitude;
     float bearing;
     float speed;
@@ -65,12 +72,10 @@ private:
     void displayMessage();
     void displayTime();
     void displayTrack();
-    void displayString(int stringid);
-    void displayPair(int stringId, float& f);
-    void displayPair(int stringId, int n);
 private:
     int m_currentDisplayScreen;
     Adafruit_SSD1306 m_display;
 };
 
+int aprintf(Print& dest, int ID, ...);
 #endif

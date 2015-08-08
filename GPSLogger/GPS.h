@@ -78,13 +78,16 @@ class GPS {
   void setdisplay(GPSDisplay *);
   void sendCommand(const char *);
   void pause(boolean b);
-  boolean wakeup(void);
-  boolean standby(void);
+
+  double calculateDistance();
 
   bool fix;
+  double distance;
   void register_sentence_callback(SentenceCallback);
   byte sentenceType() {return currentSentence;}
  private:
+  double deg2rad(const double&);
+  double calculateDistance(const double& lat1, const double& lon1, const double& lat2, const double& lon2);
   void common_init(void);
   void read(void);
   uint8_t parseHex(char c);
@@ -93,7 +96,12 @@ class GPS {
   bool parseGGA(char *);
   void endOfField();
  private:
+  double lastLatitude;
+  double lastLongitude;
+  double currentLatitude;
+  double currentLongitude;
   byte currentField;
+  bool haveFirstLocation;
   boolean paused;
   byte currentSentence;
   SentenceCallback sentenceCallback;

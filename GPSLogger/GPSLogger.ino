@@ -70,7 +70,7 @@ File *pLogfile = NULL;
 bool openFailed = false;
 GPSDisplay *pDisplay = NULL;
 int numrecs = 0;
-int LOG_INTERVAL = 10000;
+int LOG_INTERVAL = 5000;
 
 ButtonThread buttonThread;
 RMCThread rmcThread;
@@ -93,6 +93,7 @@ void sentence_callback(char *sentence)
 }
 
 void setup() {
+    //Serial.begin(9600);
     buttonThread.setup();
     rmcThread.setup();
     ggaThread.setup();
@@ -113,6 +114,7 @@ bool commonLoopStuff()
     {
         statusLights.SetFixStatus(gps.fix);
         gps.clearDataAvailable();
+        gps.calculateDistance();
         rtn = true;
     }
     buttonThread.execute();
@@ -147,11 +149,13 @@ void loggingLoop()
         {
             fix = gps.fix;
             logfile.println("Lost fix");
+            if (pDisplay) pDisplay->setScreen(DISP_SATFIX);
         }
         if (gps.fix == false && fix == true)
         {
             fix = gps.fix;
             logfile.println("Acquired fix");
+            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
         }
     }
     logfile.close();
@@ -173,6 +177,10 @@ void displayLoop()
         display.failedToOpenLogfile();
         delay(1000);
         openFailed = false;
+    }
+    if (gps.fix == false)
+    {
+        display.setScreen(DISP_SATFIX);
     }
     while (runLoop == LOOP_DISPLAY)
     {

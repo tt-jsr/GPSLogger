@@ -9,22 +9,24 @@
 #include "display.h"
 
 const char string1[] PROGMEM = "Starting...";
-const char string2[] PROGMEM = " Latitude: ";
-const char string3[] PROGMEM = "Longitude: ";
-const char string4[] PROGMEM = " Altitude: ";
-const char string5[] PROGMEM = "  Speed: ";
-const char string6[] PROGMEM = "Bearing: ";
-const char string7[] PROGMEM = "Satellites: ";
-const char string8[] PROGMEM = "Fixquality: ";
-const char string9[] PROGMEM = "      HDOP: ";
+const char string2[] PROGMEM = " Lat: %d%c %f'\n";
+const char string3[] PROGMEM = "Long: %d%c %f'\n";
+const char string4[] PROGMEM = " Alt: %f";
+const char string5[] PROGMEM = "  Speed: %f\n";
+const char string6[] PROGMEM = "Bearing: %f";
+const char string7[] PROGMEM = "Satellites: %d\n";
+const char string8[] PROGMEM = "Fixquality: %d\n";
+const char string9[] PROGMEM = "      HDOP: %f";
 const char string10[] PROGMEM = "Failed to open file";
 const char string11[] PROGMEM = "Logging...";
-const char string12[] PROGMEM = "#Records: ";
-const char string13[] PROGMEM = "Distance: ";
+const char string12[] PROGMEM = "#Records: %d\n";
+const char string13[] PROGMEM = "Distance: %f ft";
+const char string14[] PROGMEM = "Distance: %f mi";
+const char string15[] PROGMEM = "%2d/%2d/20%d\n%2d:%2d:%2d UTC";
 
 const char *const string_table[] PROGMEM = {
     string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11
-    , string12, string13
+    , string12, string13, string14, string15
 };
 
 enum STRING_ID {
@@ -40,49 +42,82 @@ enum STRING_ID {
     , ID_LOGFILE_FAILED
     , ID_RUN_LOGGING
     , ID_NUMRECS
-    , ID_DISTANCE
+    , ID_DISTANCE_FT
+    , ID_DISTANCE_MI
+    , ID_DATETIME
 };
 
-enum DisplayScreen {
-    DISP_BEGIN = 0,
-    DISP_LATLON = 1,
-    DISP_SPEEDBER = 2,
-    DISP_SATFIX = 3,
-    DISP_TIME = 4,
-    DISP_TRACK = 5,
-    DISP_END = 6
-};
+void padding(Print& dest, byte pad, long n)
+{
+    if (pad == 0)
+        return;
+    while (n)
+    {
+        n /= 10;
+        --pad;
+    }
+    if (pad <= 0)
+        return;
+    while (pad--)
+        dest.print("0");
+}
 
-int aprintf(Adafruit_SSD1306& display, char *str, ...) {
+int aprintf(Print& dest, int ID, ...) {
     int i, j, count = 0;
-
+    char buf[32];
+    char *str = buf;
+    if (ID >= 0 && ID < 100)
+    {
+        strncpy_P(buf, (char *)pgm_read_word(&string_table[ID]), sizeof(buf));
+        buf[sizeof(buf)-1] = '\0';
+    }
+    else
+    {
+        str = (char *)ID;
+    }
     va_list argv;
     va_start(argv, str);
     for(i = 0, j = 0; str[i] != '\0'; i++) {
+        byte pad = 0;
         if (str[i] == '%') {
             count++;
-
-            display.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
+            dest.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
+            if (str[i+1] >= '0' && str[i+1] <= '9')
+            {
+                ++i;
+                pad = str[i] - '0';
+                ++count;
+            }
 
             switch (str[++i]) {
                 case 'S': 
                     {
                         char buf[32];
                         strcpy_P(buf, (char *)pgm_read_word(&string_table[va_arg(argv, int)]));
-                        display.print(buf);
+                        dest.print(buf);
                     }
                     break;
-                case 'd': display.print(va_arg(argv, int));
+                case 'd': 
+                      {
+                          int n =  va_arg(argv, int);
+                          padding(dest, pad, n);
+                          dest.print(n);
+                      }
                           break;
-                case 'l': display.print(va_arg(argv, long));
+                case 'l':
+                      {
+                          long n =  va_arg(argv, long);
+                          padding(dest, pad, n);
+                          dest.print(n);
+                      }
                           break;
-                case 'f': display.print(va_arg(argv, double));
+                case 'f': dest.print(va_arg(argv, double));
                           break;
-                case 'c': display.print((char) va_arg(argv, int));
+                case 'c': dest.print((char) va_arg(argv, int));
                           break;
-                case 's': display.print(va_arg(argv, char *));
+                case 's': dest.print(va_arg(argv, char *));
                           break;
-                case '%': display.print("%");
+                case '%': dest.print("%");
                           break;
                 default:;
             };
@@ -93,7 +128,7 @@ int aprintf(Adafruit_SSD1306& display, char *str, ...) {
     va_end(argv);
 
     if(i > j) {
-        display.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
+        dest.Print::write(reinterpret_cast<const uint8_t*>(str+j), (size_t)(i-j));
     }
 
     return count;
@@ -151,8 +186,10 @@ void StatusLights::SendStatusLights()
 
 GPSDisplay::GPSDisplay()
 : m_display(OLED_DC, OLED_RESET, OLED_CS)
-, latitude(0.0)
-, longitude(0.0)
+, latDegrees(0)
+, latMinutes(0.0)
+, lonDegrees(0)
+, lonMinutes(0.0)
 , altitude(0.0)
 , bearing(0.0)
 , speed(0.0)
@@ -185,7 +222,7 @@ void GPSDisplay::setup()
 void GPSDisplay::splashScreen()
 {
   m_display.clearDisplay();
-  displayString(ID_STARTING);
+  aprintf(m_display, ID_STARTING);
   refresh();
 }
 
@@ -217,19 +254,25 @@ void GPSDisplay::lastScreen()
     refresh();
 }
 
+void GPSDisplay::setScreen(int screen)
+{
+    m_currentDisplayScreen = screen;
+    refresh();
+}
+
 void GPSDisplay::runningLogging()
 {
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayString(ID_RUN_LOGGING);
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_RUN_LOGGING);
     m_display.display();
 }
 
 void GPSDisplay::failedToOpenLogfile()
 {
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayString(ID_LOGFILE_FAILED);
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_LOGFILE_FAILED);
     m_display.display();
 }
 
@@ -259,13 +302,15 @@ void GPSDisplay::refresh()
 
 void GPSDisplay::displayLatLon()
 {
+    char buf[32];
     if (m_currentDisplayScreen != DISP_LATLON)
         return;
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayPair(ID_LATITUDE, latitude);
-    displayPair(ID_LONGITUDE, longitude);
-    displayPair(ID_ALTITUDE, altitude);
+    m_display.setTextCursor(0, 0);
+    // 248 is the degree symbol
+    aprintf(m_display, ID_LATITUDE, latDegrees, 248, latMinutes);
+    aprintf(m_display, ID_LONGITUDE, lonDegrees, 248, lonMinutes);
+    aprintf(m_display, ID_ALTITUDE, altitude*3.2808);
 }
 
 void GPSDisplay::displaySpeedBer()
@@ -273,9 +318,9 @@ void GPSDisplay::displaySpeedBer()
     if (m_currentDisplayScreen != DISP_SPEEDBER)
         return;
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayPair(ID_SPEED, speed*1.15078);
-    displayPair(ID_BEARING, bearing);
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_SPEED, speed*1.15078);
+    aprintf(m_display, ID_BEARING, bearing);
 }
 
 void GPSDisplay::displaySatFix()
@@ -283,10 +328,10 @@ void GPSDisplay::displaySatFix()
     if (m_currentDisplayScreen != DISP_SATFIX)
         return;
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayPair(ID_SATELLITES, satellites);
-    displayPair(ID_FIXQUALITY, fixquality);
-    displayPair(ID_HDOP, HDOP);
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_SATELLITES, satellites);
+    aprintf(m_display, ID_FIXQUALITY, fixquality);
+    aprintf(m_display, ID_HDOP, HDOP);
 }
 
 void GPSDisplay::displayTrack()
@@ -294,9 +339,16 @@ void GPSDisplay::displayTrack()
     if (m_currentDisplayScreen != DISP_TRACK)
         return;
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    displayPair(ID_NUMRECS, numrecs);
-    displayPair(ID_DISTANCE, distance);
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_NUMRECS, numrecs);
+    if (distance > 1610.0)
+    {
+        aprintf(m_display, ID_DISTANCE_MI, distance*.00062137);
+    }
+    else
+    {
+        aprintf(m_display, ID_DISTANCE_FT, distance*3.28984);
+    }
 }
 
 void GPSDisplay::displayTime()
@@ -304,41 +356,8 @@ void GPSDisplay::displayTime()
     if (m_currentDisplayScreen != DISP_TIME)
         return;
     m_display.clearDisplay();
-    m_display.setCursor(0, 0);
-    m_display.print(month);
-    m_display.print("/");
-    m_display.print(day);
-    m_display.print("/");
-    m_display.println(year);
-    m_display.print(hour);
-    m_display.print(":");
-    m_display.print(minute);
-    m_display.print(":");
-    m_display.print(seconds);
-    m_display.print(".");
-    m_display.print(milliseconds);
-    m_display.print(" UTC");
+    m_display.setTextCursor(0, 0);
+    aprintf(m_display, ID_DATETIME, month, day, year, hour, minute, seconds);
 }
 
-void GPSDisplay::displayString(int id)
-{
-    char buf[32];
-    strcpy_P(buf, (char *)pgm_read_word(&string_table[id]));
-    m_display.print(buf);
-}
 
-void GPSDisplay::displayPair(int id, float& f)
-{
-    char buf[32];
-    strcpy_P(buf, (char *)pgm_read_word(&string_table[id]));
-    m_display.print(buf);
-    m_display.println(f);
-}
-
-void GPSDisplay::displayPair(int id, int n)
-{
-    char buf[32];
-    strcpy_P(buf, (char *)pgm_read_word(&string_table[id]));
-    m_display.print(buf);
-    m_display.println(n);
-}
