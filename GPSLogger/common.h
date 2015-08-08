@@ -5,7 +5,7 @@
 
 #define OLED_DC     9
 #define OLED_CS     6
-#define OLED_RESET  100
+#define OLED_RESET  4
 
 #define SD_CS       10
 
