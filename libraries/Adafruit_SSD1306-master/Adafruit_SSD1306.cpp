@@ -546,6 +546,7 @@ void Adafruit_SSD1306::display() {
 // clear everything
 void Adafruit_SSD1306::clearDisplay() {
   memset(buffer, 0, (SSD1306_LCDWIDTH*SSD1306_LCDHEIGHT/8));
+  setCursor(0, 0);
 }
 
 

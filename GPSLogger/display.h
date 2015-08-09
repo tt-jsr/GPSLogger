@@ -15,7 +15,8 @@ enum DisplayScreen {
     DISP_SATFIX = 3,
     DISP_TIME = 4,
     DISP_TRACK = 5,
-    DISP_END = 6
+    DISP_ABOUT = 6,
+    DISP_END = 7
 };
 
 class StatusLights
@@ -72,10 +73,26 @@ private:
     void displayMessage();
     void displayTime();
     void displayTrack();
+    void displayAbout();
 private:
     int m_currentDisplayScreen;
     Adafruit_SSD1306 m_display;
 };
 
+/*
+ * Printf style output for arduino
+ * Can print to any Print derived object.
+ * ID: The format string, A string id string_table[]
+ *     You can also pass in a char * format casted to an int.
+ * %S A string in the string_table
+ * %[n]d A integer, with 0 padded. Pad length can be 0-9
+ * %[n]l A long, with 0 padded. Pad length can be 0-9
+ * %f    A double
+ * %s    A char * string
+ * %c    A char
+ *
+ * Buffer is only 32 chars for string_table[] format strings and
+ * %S string_table args
+ */
 int aprintf(Print& dest, int ID, ...);
 #endif

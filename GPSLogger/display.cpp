@@ -24,10 +24,12 @@ const char string13[] PROGMEM = "Distance: %f ft\n";
 const char string14[] PROGMEM = "Distance: %f mi\n";
 const char string15[] PROGMEM = "Run Time: %dh %dm %ds";
 const char string16[] PROGMEM = "%2d/%2d/20%d\n%2d:%2d:%2d UTC";
+const char string17[] PROGMEM = "GPSLogger\n  by Jeff Richards\n";
+const char string18[] PROGMEM = "Version 1.0";
 
 const char *const string_table[] PROGMEM = {
     string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11
-    , string12, string13, string14, string15, string16
+    , string12, string13, string14, string15, string16, string17, string18
 };
 
 enum STRING_ID {
@@ -47,6 +49,8 @@ enum STRING_ID {
     , ID_DISTANCE_MI
     , ID_RUNTIME
     , ID_DATETIME
+    , ID_ABOUT
+    , ID_VERSION
 };
 
 void padding(Print& dest, byte pad, long n)
@@ -297,6 +301,9 @@ void GPSDisplay::refresh()
         case DISP_TRACK:
             displayTrack();
             break;
+        case DISP_ABOUT:
+            displayAbout();
+            break;
     }
 
     m_display.display();
@@ -308,7 +315,6 @@ void GPSDisplay::displayLatLon()
     if (m_currentDisplayScreen != DISP_LATLON)
         return;
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
     // 248 is the degree symbol
     aprintf(m_display, ID_LATITUDE, latDegrees, 248, latMinutes);
     aprintf(m_display, ID_LONGITUDE, lonDegrees, 248, lonMinutes);
@@ -320,7 +326,6 @@ void GPSDisplay::displaySpeedBer()
     if (m_currentDisplayScreen != DISP_SPEEDBER)
         return;
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
     aprintf(m_display, ID_SPEED, speed*1.15078);
     aprintf(m_display, ID_BEARING, bearing);
 }
@@ -330,7 +335,6 @@ void GPSDisplay::displaySatFix()
     if (m_currentDisplayScreen != DISP_SATFIX)
         return;
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
     aprintf(m_display, ID_SATELLITES, satellites);
     aprintf(m_display, ID_FIXQUALITY, fixquality);
     aprintf(m_display, ID_HDOP, HDOP);
@@ -341,7 +345,6 @@ void GPSDisplay::displayTrack()
     if (m_currentDisplayScreen != DISP_TRACK)
         return;
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
     aprintf(m_display, ID_NUMRECS, numrecs);
     if (distance > 1610.0)
     {
@@ -365,8 +368,16 @@ void GPSDisplay::displayTime()
     if (m_currentDisplayScreen != DISP_TIME)
         return;
     m_display.clearDisplay();
-    m_display.setTextCursor(0, 0);
     aprintf(m_display, ID_DATETIME, month, day, year, hour, minute, seconds);
+}
+
+void GPSDisplay::displayAbout()
+{
+    if (m_currentDisplayScreen != DISP_ABOUT)
+        return;
+    m_display.clearDisplay();
+    aprintf(m_display, ID_ABOUT);
+    aprintf(m_display, ID_VERSION);
 }
 
 
