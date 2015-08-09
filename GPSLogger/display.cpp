@@ -25,7 +25,7 @@ const char string14[] PROGMEM = "Distance: %f mi\n";
 const char string15[] PROGMEM = "Run Time: %dh %dm %ds";
 const char string16[] PROGMEM = "%2d/%2d/20%d\n%2d:%2d:%2d UTC";
 const char string17[] PROGMEM = "GPSLogger\n  by Jeff Richards\n";
-const char string18[] PROGMEM = "Version 1.0";
+const char string18[] PROGMEM = "Version 1.1";
 
 const char *const string_table[] PROGMEM = {
     string1, string2, string3, string4, string5, string6, string7, string8, string9, string10, string11

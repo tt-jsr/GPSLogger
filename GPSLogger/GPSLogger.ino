@@ -120,15 +120,15 @@ bool commonLoopStuff()
         {
             statusLights.SetFixStatus(gps.fix);
             fix = gps.fix;
-            if (pLogfile) pLogfile->println("Lost fix");
-            if (pDisplay) pDisplay->setScreen(DISP_SATFIX);
+            if (pLogfile) pLogfile->println("Acquired fix");
+            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
         }
         if (gps.fix == false && fix == true)
         {
             statusLights.SetFixStatus(gps.fix);
             fix = gps.fix;
-            if (pLogfile) pLogfile->println("Acquired fix");
-            if (pDisplay) pDisplay->setScreen(DISP_LATLON);
+            if (pLogfile) pLogfile->println("Lost fix");
+            if (pDisplay) pDisplay->setScreen(DISP_SATFIX);
         }
     }
     buttonThread.execute();
