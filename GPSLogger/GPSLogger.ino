@@ -100,7 +100,7 @@ void setup() {
     ggaThread.setup();
     turnOffWriteStatus.setup();
 
-    gps.setup(4800);
+    gps.setup(9600);
     statusLights.SetLoggingStatus(LOG_DISABLED);
     statusLights.SetFixStatus(false);
     pLogfile = NULL;
